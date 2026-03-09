@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MCP WebSocket Hub — Test UI</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, sans-serif; margin: 0; padding: 1rem; background: #0f0f12; color: #e4e4e7; }
+    h1 { font-size: 1.25rem; margin: 0 0 1rem; color: #a1a1aa; }
+    section { margin-bottom: 1.5rem; }
+    .card { background: #18181b; border: 1px solid #27272a; border-radius: 8px; padding: 1rem; }
+    label { display: block; margin-bottom: 0.25rem; font-size: 0.875rem; color: #a1a1aa; }
+    input, select, textarea, button { padding: 0.5rem 0.75rem; border-radius: 6px; border: 1px solid #3f3f46; background: #27272a; color: #e4e4e7; font-size: 0.875rem; }
+    input { width: 100%; max-width: 240px; }
+    textarea { width: 100%; min-height: 120px; font-family: ui-monospace, monospace; resize: vertical; }
+    button { cursor: pointer; margin-right: 0.5rem; margin-top: 0.5rem; }
+    button:hover { background: #3f3f46; }
+    button.primary { background: #3b82f6; border-color: #3b82f6; color: white; }
+    button.primary:hover { background: #2563eb; }
+    button.danger { background: #dc2626; border-color: #dc2626; color: white; }
+    #devices-list { margin-top: 0.5rem; }
+    .flow-steps { display: flex; flex-direction: column; gap: 0.75rem; }
+    .flow-step { display: flex; gap: 0.75rem; align-items: flex-start; padding: 0.5rem 0; border-bottom: 1px solid #27272a; }
+    .flow-step:last-child { border-bottom: none; }
+    .step-num { flex-shrink: 0; width: 1.5rem; height: 1.5rem; display: inline-flex; align-items: center; justify-content: center; background: #3f3f46; border-radius: 50%; font-size: 0.75rem; font-weight: 600; }
+    .flow-step div { flex: 1; min-width: 0; }
+    .flow-step strong { font-size: 0.875rem; }
+    .step-desc { margin: 0.25rem 0 0.5rem; font-size: 0.8125rem; color: #a1a1aa; line-height: 1.4; }
+    .flow-step code { background: #27272a; padding: 0.125rem 0.375rem; border-radius: 4px; font-size: 0.75rem; }
+    .step-action { font-size: 0.75rem; padding: 0.25rem 0.5rem; margin-right: 0.25rem; margin-top: 0.25rem; }
+  </style>
+</head>
+<body>
+  <h1>MCP WebSocket Hub — Test UI</h1>
+
+  <section class="card" id="sample-flow">
+    <h2 style="margin: 0 0 0.5rem; font-size: 1rem;">Sample Flow: Zeroclaw ↔ Device</h2>
+    <p style="margin: 0 0 0.75rem; font-size: 0.875rem; color: #a1a1aa;">Follow these steps to test Zeroclaw interacting with a device via the hub.</p>
+    <div class="flow-steps">
+      <div class="flow-step" data-step="1">
+        <span class="step-num">1</span>
+        <div>
+          <strong>Start Zeroclaw with MCP hub</strong>
+          <p class="step-desc">Run <code>zeroclaw serve</code> (or <code>gateway</code>) with hub URL in config, then run <code>zeroclaw register</code> in another terminal to create a pairing code.</p>
+          <button type="button" class="step-action" data-action="refresh-pairings">Refresh pairings</button>
+        </div>
+      </div>
+      <div class="flow-step" data-step="2">
+        <span class="step-num">2</span>
+        <div>
+          <strong>Confirm pairing</strong>
+          <p class="step-desc">Copy the pairing code from section 1 below. In the Zeroclaw terminal running <code>register</code>, paste the code when prompted. Or call <code>POST /api/v1/devices/register/confirm</code> with the pairing code.</p>
+        </div>
+      </div>
+      <div class="flow-step" data-step="3">
+        <span class="step-num">3</span>
+        <div>
+          <strong>Device appears in Connected Devices</strong>
+          <p class="step-desc">After pairing, the device shows in section 2. Click <strong>Call</strong> next to the device to load it into the MCP request form and fetch its tools.</p>
+          <button type="button" class="step-action" data-action="refresh-devices">Refresh devices</button>
+        </div>
+      </div>
+      <div class="flow-step" data-step="4">
+        <span class="step-num">4</span>
+        <div>
+          <strong>Initialize MCP session</strong>
+          <p class="step-desc">With device ID set, send <code>initialize</code> to handshake. Then send <code>tools/list</code> to see available tools.</p>
+          <button type="button" class="step-action" data-action="send-initialize">Send initialize</button>
+          <button type="button" class="step-action" data-action="send-tools-list">Send tools/list</button>
+        </div>
+      </div>
+      <div class="flow-step" data-step="5">
+        <span class="step-num">5</span>
+        <div>
+          <strong>Call a tool</strong>
+          <p class="step-desc">Select a tool (e.g. <code>file_read</code>, <code>memory_recall</code>), set method to <code>tools/call</code>, adjust arguments if needed, then click <strong>Send</strong>.</p>
+          <button type="button" class="step-action" data-action="send-file-read">Call file_read (README.md)</button>
+          <button type="button" class="step-action" data-action="send-memory-recall">Call memory_recall</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2 style="margin: 0 0 0.5rem; font-size: 1rem;">1. Pending Pairing Codes</h2>
+    <p style="margin: 0 0 0.5rem; font-size: 0.875rem; color: #a1a1aa;">When zeroclaw register runs, pairing codes appear here and in the hub terminal.</p>
+    <button id="btn-refresh-pairings">Refresh</button>
+    <div id="pairings-list" style="margin-top: 0.5rem; font-size: 1.25rem; font-weight: 600; letter-spacing: 0.2em;"></div>
+  </section>
+
+  <section class="card">
+    <h2 style="margin: 0 0 0.5rem; font-size: 1rem;">2. Connected Devices</h2>
+    <p style="margin: 0 0 0.5rem; font-size: 0.875rem; color: #a1a1aa;">Call fills device ID in section 3. Revoke disconnects and removes credential; device must re-register.</p>
+    <button id="btn-refresh-devices">Refresh</button>
+    <div id="devices-list"></div>
+  </section>
+
+  <section class="card">
+    <h2 style="margin: 0 0 0.5rem; font-size: 1rem;">3. Send MCP Request (as DatumBridge)</h2>
+    <p style="margin: 0 0 0.5rem; font-size: 0.875rem; color: #a1a1aa;">Sends JSON-RPC to device via hub proxy. Tools are auto-loaded when device ID is set.</p>
+    <label>Device ID</label>
+    <input type="text" id="target-device" placeholder="device to call (or click Call in section 2)">
+    <label style="margin-top: 0.5rem;">Tool to call (for tools/call)</label>
+    <select id="tool-select">
+      <option value="">— Select device first —</option>
+    </select>
+    <label style="margin-top: 0.5rem;">MCP Method</label>
+    <select id="mcp-method">
+      <option value="initialize">initialize</option>
+      <option value="tools/list">tools/list</option>
+      <option value="tools/call">tools/call</option>
+    </select>
+    <label style="margin-top: 0.5rem;">Request body (JSON)</label>
+    <p style="margin: 0 0 0.25rem; font-size: 0.75rem; color: #71717a;">For file tools: use <b>relative paths</b> (e.g. README.md). Absolute paths are blocked unless in [autonomy].allowed_roots.</p>
+    <textarea id="mcp-body">{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test-ui","version":"1.0"}}}</textarea>
+    <div style="margin-top: 0.5rem;">
+      <button id="btn-send" class="primary">Send</button>
+    </div>
+    <label style="margin-top: 1rem;">Response</label>
+    <pre id="mcp-response" class="log" style="min-height: 80px; font-family: ui-monospace, monospace; font-size: 0.75rem; white-space: pre-wrap; word-break: break-all;"></pre>
+  </section>
+
+  <script>
+    const base = window.location.origin;
+
+    const toolTemplates = {
+      file_read: { path: "README.md", offset: 1, limit: 50 },
+      file_edit: { path: "example.txt", old_string: "old text", new_string: "new text" },
+      file_write: { path: "output.txt", content: "Hello, world!" },
+      pdf_read: { path: "document.pdf", max_chars: 10000 },
+      shell: { command: "echo hello" },
+      memory_recall: { query: "search term", limit: 5 },
+      memory_store: { key: "test_note", content: "Note to remember" },
+      web_fetch: { url: "https://example.com" },
+      web_search: { query: "search query" },
+      browser: { action: "open", url: "https://example.com" },
+      browser_open: { url: "https://example.com" }
+    };
+
+    let cachedTools = [];
+
+    async function fetchToolsList(deviceId) {
+      if (!deviceId) return;
+      const respEl = document.getElementById('mcp-response');
+      const selectEl = document.getElementById('tool-select');
+      try {
+        const req = { jsonrpc: '2.0', id: 99, method: 'tools/list', params: {} };
+        const r = await fetch(`${base}/api/v1/devices/${encodeURIComponent(deviceId)}/mcp`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(req)
+        });
+        const text = await r.text();
+        respEl.textContent = r.ok ? text : `HTTP ${r.status}\n${text}`;
+        if (!r.ok) return;
+        const j = JSON.parse(text);
+        const tools = j.result?.tools || [];
+        cachedTools = tools;
+        selectEl.innerHTML = '<option value="">— Select tool —</option>' +
+          tools.map(t => `<option value="${t.name}">${t.name} — ${(t.description || '').slice(0, 50)}…</option>`).join('');
+      } catch (e) {
+        respEl.textContent = 'Error: ' + e.message;
+      }
+    }
+
+    async function refreshDevices() {
+      const r = await fetch(base + '/api/v1/devices');
+      const j = await r.json();
+      const list = document.getElementById('devices-list');
+      list.innerHTML = '';
+      (j.devices || []).forEach(d => {
+        const wrap = document.createElement('span');
+        wrap.style.display = 'inline-flex';
+        wrap.style.alignItems = 'center';
+        wrap.style.gap = '0.5rem';
+        wrap.style.margin = '0.25rem';
+        const label = document.createElement('span');
+        label.textContent = d;
+        const callBtn = document.createElement('button');
+        callBtn.textContent = 'Call';
+        callBtn.className = 'primary';
+        callBtn.style.fontSize = '0.75rem';
+        callBtn.style.padding = '0.25rem 0.5rem';
+        callBtn.onclick = () => {
+          document.getElementById('target-device').value = d;
+          fetchToolsList(d);
+        };
+        const revokeBtn = document.createElement('button');
+        revokeBtn.textContent = 'Revoke';
+        revokeBtn.className = 'danger';
+        revokeBtn.style.fontSize = '0.75rem';
+        revokeBtn.style.padding = '0.25rem 0.5rem';
+        revokeBtn.onclick = async () => {
+          if (!confirm(`Revoke device "${d}"? It will be disconnected and must re-register to connect again.`)) return;
+          try {
+            const dr = await fetch(`${base}/api/v1/devices/${encodeURIComponent(d)}`, { method: 'DELETE' });
+            if (dr.ok) refreshDevices();
+            else alert('Failed to revoke: ' + (await dr.text()));
+          } catch (e) {
+            alert('Error: ' + e.message);
+          }
+        };
+        wrap.appendChild(label);
+        wrap.appendChild(callBtn);
+        wrap.appendChild(revokeBtn);
+        list.appendChild(wrap);
+      });
+    }
+
+    document.getElementById('btn-refresh-devices').onclick = refreshDevices;
+
+    document.getElementById('sample-flow').addEventListener('click', (e) => {
+      const btn = e.target.closest('.step-action');
+      if (!btn) return;
+      const deviceId = document.getElementById('target-device').value.trim();
+      const respEl = document.getElementById('mcp-response');
+      const action = btn.dataset.action;
+      if (action === 'refresh-pairings') {
+        refreshPairings();
+      } else if (action === 'refresh-devices') {
+        refreshDevices();
+      } else if (action === 'send-initialize' || action === 'send-tools-list' || action === 'send-file-read' || action === 'send-memory-recall') {
+        if (!deviceId) {
+          respEl.textContent = 'Set Device ID first (section 2: click Call next to a device).';
+          return;
+        }
+        let body;
+        if (action === 'send-initialize') {
+          body = '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test-ui","version":"1.0"}}}';
+          document.getElementById('mcp-method').value = 'initialize';
+        } else if (action === 'send-tools-list') {
+          body = '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}';
+          document.getElementById('mcp-method').value = 'tools/list';
+        } else if (action === 'send-file-read') {
+          body = JSON.stringify({
+            jsonrpc: '2.0',
+            id: 3,
+            method: 'tools/call',
+            params: { name: 'file_read', arguments: { path: 'README.md', offset: 1, limit: 50 } }
+          }, null, 2);
+          document.getElementById('mcp-method').value = 'tools/call';
+          document.getElementById('tool-select').value = 'file_read';
+        } else {
+          body = JSON.stringify({
+            jsonrpc: '2.0',
+            id: 3,
+            method: 'tools/call',
+            params: { name: 'memory_recall', arguments: { query: 'test', limit: 5 } }
+          }, null, 2);
+          document.getElementById('mcp-method').value = 'tools/call';
+          document.getElementById('tool-select').value = 'memory_recall';
+        }
+        document.getElementById('mcp-body').value = body;
+        fetch(`${base}/api/v1/devices/${encodeURIComponent(deviceId)}/mcp`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body
+        }).then(r => r.text()).then(text => {
+          respEl.textContent = text;
+          if (action === 'send-tools-list' && text) {
+            try {
+              const j = JSON.parse(text);
+              const tools = j.result?.tools || [];
+              if (tools.length) {
+                const selectEl = document.getElementById('tool-select');
+                cachedTools = tools;
+                selectEl.innerHTML = '<option value="">— Select tool —</option>' +
+                  tools.map(t => `<option value="${t.name}">${t.name} — ${(t.description || '').slice(0, 50)}…</option>`).join('');
+              }
+            } catch (_) {}
+          }
+        }).catch(err => { respEl.textContent = 'Error: ' + err.message; });
+      }
+    });
+
+    async function refreshPairings() {
+      const r = await fetch(base + '/api/v1/pairing/pending');
+      const j = await r.json();
+      const list = document.getElementById('pairings-list');
+      const pairings = j.pairings || [];
+      if (pairings.length === 0) {
+        list.textContent = 'No pending pairings. Run zeroclaw register to create one.';
+      } else {
+        list.innerHTML = pairings.map(p => `<span style="display:block;margin:0.25rem 0;">${p.pairing_code}</span>`).join('');
+      }
+    }
+    document.getElementById('btn-refresh-pairings').onclick = refreshPairings;
+    setInterval(refreshPairings, 2000);
+
+    document.getElementById('target-device').onchange = function() {
+      const id = this.value.trim();
+      if (id) fetchToolsList(id);
+    };
+
+    document.getElementById('btn-send').onclick = async () => {
+      const deviceId = document.getElementById('target-device').value.trim();
+      const body = document.getElementById('mcp-body').value;
+      const respEl = document.getElementById('mcp-response');
+      try {
+        const r = await fetch(`${base}/api/v1/devices/${encodeURIComponent(deviceId)}/mcp`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body
+        });
+        const text = await r.text();
+        respEl.textContent = r.ok ? text : `HTTP ${r.status}\n${text}`;
+      } catch (e) {
+        respEl.textContent = 'Error: ' + e.message;
+      }
+    };
+
+    document.getElementById('tool-select').onchange = () => {
+      const tool = document.getElementById('tool-select').value;
+      const method = document.getElementById('mcp-method').value;
+      if (tool && method === 'tools/call') {
+        const args = toolTemplates[tool] || { path: "example.txt" };
+        document.getElementById('mcp-body').value = JSON.stringify({
+          jsonrpc: '2.0',
+          id: 3,
+          method: 'tools/call',
+          params: { name: tool, arguments: args }
+        }, null, 2);
+      }
+    };
+
+    document.getElementById('mcp-method').onchange = () => {
+      const m = document.getElementById('mcp-method').value;
+      const body = document.getElementById('mcp-body');
+      const tool = document.getElementById('tool-select').value;
+      if (m === 'initialize') {
+        body.value = '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test-ui","version":"1.0"}}}';
+      } else if (m === 'tools/list') {
+        body.value = '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}';
+      } else if (m === 'tools/call' && tool) {
+        const args = toolTemplates[tool] || { path: "example.txt" };
+        body.value = JSON.stringify({
+          jsonrpc: '2.0',
+          id: 3,
+          method: 'tools/call',
+          params: { name: tool, arguments: args }
+        }, null, 2);
+      } else if (m === 'tools/call') {
+        body.value = '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"file_read","arguments":{"path":"README.md"}}}';
+      }
+    };
+
+    refreshDevices();
+    refreshPairings();
+  </script>
+</body>
+</html>

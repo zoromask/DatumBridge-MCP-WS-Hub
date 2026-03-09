@@ -1,0 +1,220 @@
+package hub
+
+import (
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+	"sync"
+	"time"
+
+	"github.com/rs/zerolog/log"
+)
+
+
+// Conn represents a registered device WebSocket connection
+type Conn struct {
+	DeviceID string
+	Send     chan []byte // requests to forward to device
+}
+
+// pendingReq holds a waiting HTTP request for a JSON-RPC response
+type pendingReq struct {
+	ch    chan []byte
+	timer *time.Timer
+}
+
+// Hub maintains device_id -> connection mapping and request/response correlation
+type Hub struct {
+	mu           sync.RWMutex
+	conns        map[string]*Conn
+	pending      map[string]*pendingReq // key: "deviceID|rpcID"
+	pendingMu    sync.Mutex
+	creds        *credentialStore
+	pairingStore *pairingStore
+}
+
+// credentialsFilePath returns the path for persisting device credentials.
+// Uses HUB_CREDENTIALS_FILE env, default ./data/devices.json
+func credentialsFilePath() string {
+	if p := os.Getenv("HUB_CREDENTIALS_FILE"); p != "" {
+		return p
+	}
+	return filepath.Join("data", "devices.json")
+}
+
+// New creates a new Hub. Device credentials are persisted to file (HUB_CREDENTIALS_FILE or ./data/devices.json)
+// so registered devices can reconnect after server restart.
+func New() *Hub {
+	credsPath := credentialsFilePath()
+	creds := newCredentialStore(credsPath)
+	if n := creds.Count(); n > 0 {
+		log.Info().Str("file", credsPath).Int("devices", n).Msg("loaded persisted device credentials")
+	}
+	return &Hub{
+		conns:        make(map[string]*Conn),
+		pending:      make(map[string]*pendingReq),
+		creds:        creds,
+		pairingStore: newPairingStore(),
+	}
+}
+
+// Register adds a device connection. Replaces existing connection for same device_id.
+func (h *Hub) Register(deviceID string, send chan []byte) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if old, ok := h.conns[deviceID]; ok {
+		close(old.Send)
+	}
+	h.conns[deviceID] = &Conn{
+		DeviceID: deviceID,
+		Send:     send,
+	}
+}
+
+// RevokeDevice disconnects the device (if connected) and removes its credential.
+// The device cannot reconnect until it registers again.
+func (h *Hub) RevokeDevice(deviceID string) {
+	h.Unregister(deviceID)
+	h.creds.RevokeDevice(deviceID)
+}
+
+// Unregister removes a device connection
+func (h *Hub) Unregister(deviceID string) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	if c, ok := h.conns[deviceID]; ok {
+		close(c.Send)
+		delete(h.conns, deviceID)
+	}
+	// Cancel any pending requests for this device
+	h.pendingMu.Lock()
+	for k, pr := range h.pending {
+		if len(k) > len(deviceID) && k[:len(deviceID)] == deviceID && k[len(deviceID)] == '|' {
+			pr.timer.Stop()
+			close(pr.ch)
+			delete(h.pending, k)
+		}
+	}
+	h.pendingMu.Unlock()
+}
+
+// Get returns the connection for a device, or nil if not registered
+func (h *Hub) Get(deviceID string) *Conn {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	return h.conns[deviceID]
+}
+
+// ListDeviceIDs returns all connected device IDs
+func (h *Hub) ListDeviceIDs() []string {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	ids := make([]string, 0, len(h.conns))
+	for id := range h.conns {
+		ids = append(ids, id)
+	}
+	return ids
+}
+
+// ForwardRequest sends a JSON-RPC request to the device and waits for the response.
+// Returns the response body or error. Timeout after timeoutDur.
+func (h *Hub) ForwardRequest(deviceID string, payload []byte, timeoutDur time.Duration) ([]byte, bool) {
+	// Extract id from request for correlation
+	var req struct {
+		ID interface{} `json:"id"`
+	}
+	if err := json.Unmarshal(payload, &req); err != nil {
+		return nil, false
+	}
+	rpcID := idToString(req.ID)
+	if rpcID == "" {
+		rpcID = "0"
+	}
+
+	key := deviceID + "|" + rpcID
+	ch := make(chan []byte, 1)
+
+	h.pendingMu.Lock()
+	if _, exists := h.pending[key]; exists {
+		h.pendingMu.Unlock()
+		return nil, false
+	}
+	pr := &pendingReq{
+		ch: ch,
+		timer: time.AfterFunc(timeoutDur, func() {
+			h.pendingMu.Lock()
+			if p, ok := h.pending[key]; ok {
+				delete(h.pending, key)
+				p.timer.Stop()
+				close(p.ch)
+			}
+			h.pendingMu.Unlock()
+		}),
+	}
+	h.pending[key] = pr
+	h.pendingMu.Unlock()
+
+	h.mu.RLock()
+	c := h.conns[deviceID]
+	h.mu.RUnlock()
+
+	if c == nil {
+		h.pendingMu.Lock()
+		if p, ok := h.pending[key]; ok {
+			delete(h.pending, key)
+			p.timer.Stop()
+			close(p.ch)
+		}
+		h.pendingMu.Unlock()
+		return nil, false
+	}
+
+	select {
+	case c.Send <- payload:
+	default:
+		h.pendingMu.Lock()
+		if p, ok := h.pending[key]; ok {
+			delete(h.pending, key)
+			p.timer.Stop()
+			close(p.ch)
+		}
+		h.pendingMu.Unlock()
+		return nil, false
+	}
+
+	resp, ok := <-ch
+	return resp, ok
+}
+
+// DeliverResponse is called when a JSON-RPC response is received from a device
+func (h *Hub) DeliverResponse(deviceID string, payload []byte) {
+	var resp struct {
+		ID interface{} `json:"id"`
+	}
+	if err := json.Unmarshal(payload, &resp); err != nil {
+		return
+	}
+	rpcID := idToString(resp.ID)
+	key := deviceID + "|" + rpcID
+
+	h.pendingMu.Lock()
+	pr, ok := h.pending[key]
+	if ok {
+		delete(h.pending, key)
+		pr.timer.Stop()
+		select {
+		case pr.ch <- payload:
+		default:
+		}
+		close(pr.ch)
+	}
+	h.pendingMu.Unlock()
+}
+
+func idToString(v interface{}) string {
+	if v == nil {
+		return ""
+	}
+	return fmt.Sprint(v)
+}

@@ -1,0 +1,9 @@
+# Persisted device credentials (contains hashed tokens)
+data/
+*.devices.json
+
+# Environment
+.env
+
+# Binary
+mcp-ws-hub
