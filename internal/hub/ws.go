@@ -79,11 +79,16 @@ func (h *Hub) HandleWS(w http.ResponseWriter, r *http.Request) {
 	}
 	defer conn.Close()
 
+	remoteIP := r.RemoteAddr
+	if fwd := r.Header.Get("X-Forwarded-For"); fwd != "" {
+		remoteIP = strings.SplitN(fwd, ",", 2)[0]
+	}
+
 	send := make(chan []byte, 16)
-	h.Register(deviceID, send)
+	h.Register(deviceID, send, remoteIP)
 	defer h.Unregister(deviceID)
 
-	log.Info().Str("device_id", deviceID).Msg("device connected")
+	log.Info().Str("device_id", deviceID).Str("remote_ip", remoteIP).Msg("device connected")
 
 	// Writer goroutine: forward messages from send channel + periodic pings
 	go func() {

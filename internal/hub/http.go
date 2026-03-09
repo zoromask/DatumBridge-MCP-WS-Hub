@@ -13,8 +13,8 @@ import (
 )
 
 const (
-	requestTimeout = 60 * time.Second
-	maxBodySize    = 1 << 20 // 1 MB
+	requestTimeout = 5 * time.Minute // long enough for cursor agent --print
+	maxBodySize    = 1 << 20         // 1 MB
 )
 
 // APIError is a standardized error response matching the DatumBridge MCP convention.
@@ -115,12 +115,12 @@ func HandleHealth(w http.ResponseWriter, _ *http.Request) {
 	_, _ = w.Write([]byte(`{"status":"ok","service":"datumbridge-mcp-ws-hub"}`))
 }
 
-// HandleListDevices returns connected device IDs
+// HandleListDevices returns all registered devices with metadata and connection status.
 func (h *Hub) HandleListDevices(w http.ResponseWriter, _ *http.Request) {
-	ids := h.ListDeviceIDs()
+	infos := h.ListDeviceInfos()
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	_ = json.NewEncoder(w).Encode(map[string]interface{}{"devices": ids})
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{"devices": infos})
 }
 
 // HandleRevokeDevice disconnects a device and removes its credential (DELETE /api/v1/devices/{device_id})
@@ -148,8 +148,11 @@ func (h *Hub) HandleListPendingPairings(w http.ResponseWriter, _ *http.Request) 
 
 // RegisterDeviceRequest is the body for POST /api/v1/devices/register
 type RegisterDeviceRequest struct {
-	DeviceID string `json:"device_id"`
-	Pairing  bool   `json:"pairing"`
+	DeviceID   string `json:"device_id"`
+	Pairing    bool   `json:"pairing"`
+	DeviceName string `json:"device_name,omitempty"`
+	DeviceIP   string `json:"device_ip,omitempty"`
+	DeviceMAC  string `json:"device_mac,omitempty"`
 }
 
 // RegisterDeviceResponse is the response from POST /api/v1/devices/register
@@ -157,11 +160,15 @@ type RegisterDeviceResponse struct {
 	DeviceID    string `json:"device_id,omitempty"`
 	Token       string `json:"token,omitempty"`
 	PairingCode string `json:"pairing_code,omitempty"`
+	DeviceName  string `json:"device_name,omitempty"`
 }
 
 // ConfirmPairingRequest is the body for POST /api/v1/devices/register/confirm
 type ConfirmPairingRequest struct {
 	PairingCode string `json:"pairing_code"`
+	DeviceName  string `json:"device_name,omitempty"`
+	DeviceIP    string `json:"device_ip,omitempty"`
+	DeviceMAC   string `json:"device_mac,omitempty"`
 }
 
 // HandleRegisterDevice creates a new device credential.
@@ -201,7 +208,7 @@ func (h *Hub) HandleRegisterDevice(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cred, err := h.creds.RegisterDevice(req.DeviceID)
+	cred, err := h.creds.RegisterDevice(req.DeviceID, req.DeviceName, req.DeviceIP, req.DeviceMAC)
 	if err != nil {
 		writeAPIError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "failed to generate credential", true)
 		return
@@ -210,8 +217,9 @@ func (h *Hub) HandleRegisterDevice(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	_ = json.NewEncoder(w).Encode(RegisterDeviceResponse{
-		DeviceID: cred.DeviceID,
-		Token:    cred.Token,
+		DeviceID:   cred.DeviceID,
+		Token:      cred.Token,
+		DeviceName: cred.DeviceName,
 	})
 }
 
@@ -236,10 +244,22 @@ func (h *Hub) HandleConfirmPairing(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Attach device metadata from the confirm request
+	if req.DeviceName != "" {
+		cred.DeviceName = req.DeviceName
+	}
+	if req.DeviceIP != "" {
+		cred.DeviceIP = req.DeviceIP
+	}
+	if req.DeviceMAC != "" {
+		cred.DeviceMAC = req.DeviceMAC
+	}
+
 	// Return plain token to device before hashing for storage
 	resp := RegisterDeviceResponse{
-		DeviceID: cred.DeviceID,
-		Token:    cred.Token,
+		DeviceID:   cred.DeviceID,
+		Token:      cred.Token,
+		DeviceName: cred.DeviceName,
 	}
 
 	if err := h.creds.AddCredential(cred); err != nil {

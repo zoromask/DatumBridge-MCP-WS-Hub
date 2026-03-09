@@ -21,14 +21,26 @@ const bcryptCost = bcrypt.DefaultCost
 // DeviceCredential holds the server-generated secret for a device.
 // Token is plain-text only in memory during registration; stored as bcrypt hash.
 type DeviceCredential struct {
-	DeviceID string
-	Token    string
+	DeviceID   string
+	Token      string
+	DeviceName string
+	DeviceIP   string
+	DeviceMAC  string
 }
 
-// credentialStore maps device_id -> bcrypt-hashed token.
+// deviceRecord is the on-disk representation per device.
+type deviceRecord struct {
+	TokenHash    string `json:"token_hash"`
+	DeviceName   string `json:"device_name,omitempty"`
+	DeviceIP     string `json:"device_ip,omitempty"`
+	DeviceMAC    string `json:"device_mac,omitempty"`
+	RegisteredAt string `json:"registered_at,omitempty"`
+}
+
+// credentialStore maps device_id -> deviceRecord (bcrypt-hashed token + metadata).
 type credentialStore struct {
 	mu       sync.RWMutex
-	tokens   map[string]string // device_id -> bcrypt hash
+	devices  map[string]*deviceRecord
 	filePath string
 }
 
@@ -46,7 +58,7 @@ type pairingStore struct {
 
 func newCredentialStore(filePath string) *credentialStore {
 	s := &credentialStore{
-		tokens:   make(map[string]string),
+		devices:  make(map[string]*deviceRecord),
 		filePath: filePath,
 	}
 	if filePath != "" {
@@ -65,40 +77,75 @@ func (s *credentialStore) load() error {
 		}
 		return err
 	}
-	var payload map[string]string
-	if err := json.Unmarshal(data, &payload); err != nil {
-		return err
-	}
-	if payload == nil {
-		payload = make(map[string]string)
+
+	// Try new format first: map[string]*deviceRecord
+	var newPayload map[string]*deviceRecord
+	if err := json.Unmarshal(data, &newPayload); err == nil && isNewFormat(newPayload) {
+		migrated := false
+		for k, rec := range newPayload {
+			if !isBcryptHash(rec.TokenHash) {
+				hash, err := bcrypt.GenerateFromPassword([]byte(rec.TokenHash), bcryptCost)
+				if err != nil {
+					log.Error().Err(err).Str("device_id", k).Msg("failed to migrate token to bcrypt")
+					continue
+				}
+				rec.TokenHash = string(hash)
+				migrated = true
+			}
+		}
+		s.mu.Lock()
+		s.devices = newPayload
+		s.mu.Unlock()
+		if migrated {
+			if err := s.save(); err != nil {
+				log.Error().Err(err).Msg("failed to persist migrated credentials")
+			} else {
+				log.Info().Msg("migrated plain-text tokens to bcrypt hashes")
+			}
+		}
+		return nil
 	}
 
-	// Migrate any plain-text tokens to bcrypt hashes on load
-	migrated := false
-	for k, v := range payload {
+	// Fallback: old format map[string]string (device_id -> token/hash)
+	var oldPayload map[string]string
+	if err := json.Unmarshal(data, &oldPayload); err != nil {
+		return err
+	}
+	devices := make(map[string]*deviceRecord, len(oldPayload))
+	for k, v := range oldPayload {
+		tokenHash := v
 		if !isBcryptHash(v) {
 			hash, err := bcrypt.GenerateFromPassword([]byte(v), bcryptCost)
 			if err != nil {
 				log.Error().Err(err).Str("device_id", k).Msg("failed to migrate token to bcrypt")
 				continue
 			}
-			payload[k] = string(hash)
-			migrated = true
+			tokenHash = string(hash)
+		}
+		devices[k] = &deviceRecord{
+			TokenHash:    tokenHash,
+			RegisteredAt: time.Now().UTC().Format(time.RFC3339),
 		}
 	}
-
 	s.mu.Lock()
-	s.tokens = payload
+	s.devices = devices
 	s.mu.Unlock()
-
-	if migrated {
-		if err := s.save(); err != nil {
-			log.Error().Err(err).Msg("failed to persist migrated credentials")
-		} else {
-			log.Info().Msg("migrated plain-text tokens to bcrypt hashes")
-		}
+	if err := s.save(); err != nil {
+		log.Error().Err(err).Msg("failed to persist migrated credentials to new format")
+	} else {
+		log.Info().Int("devices", len(devices)).Msg("migrated credentials from old format to new format")
 	}
 	return nil
+}
+
+// isNewFormat checks if the unmarshalled payload looks like new deviceRecord format
+func isNewFormat(payload map[string]*deviceRecord) bool {
+	for _, rec := range payload {
+		if rec != nil && rec.TokenHash != "" {
+			return true
+		}
+	}
+	return len(payload) == 0
 }
 
 func isBcryptHash(s string) bool {
@@ -110,9 +157,10 @@ func (s *credentialStore) save() error {
 		return nil
 	}
 	s.mu.RLock()
-	payload := make(map[string]string, len(s.tokens))
-	for k, v := range s.tokens {
-		payload[k] = v
+	payload := make(map[string]*deviceRecord, len(s.devices))
+	for k, v := range s.devices {
+		cp := *v
+		payload[k] = &cp
 	}
 	s.mu.RUnlock()
 	data, err := json.MarshalIndent(payload, "", "  ")
@@ -205,7 +253,7 @@ func (p *pairingStore) Consume(code string) (*DeviceCredential, bool) {
 	return cred, true
 }
 
-// AddCredential hashes the plain token and persists it.
+// AddCredential hashes the plain token and persists it with device metadata.
 // Must be called with cred.Token as plain text (not yet hashed).
 func (s *credentialStore) AddCredential(cred *DeviceCredential) error {
 	hash, err := bcrypt.GenerateFromPassword([]byte(cred.Token), bcryptCost)
@@ -213,8 +261,15 @@ func (s *credentialStore) AddCredential(cred *DeviceCredential) error {
 		log.Error().Err(err).Str("device_id", cred.DeviceID).Msg("failed to hash token")
 		return err
 	}
+	rec := &deviceRecord{
+		TokenHash:    string(hash),
+		DeviceName:   cred.DeviceName,
+		DeviceIP:     cred.DeviceIP,
+		DeviceMAC:    cred.DeviceMAC,
+		RegisteredAt: time.Now().UTC().Format(time.RFC3339),
+	}
 	s.mu.Lock()
-	s.tokens[cred.DeviceID] = string(hash)
+	s.devices[cred.DeviceID] = rec
 	s.mu.Unlock()
 	if err := s.save(); err != nil {
 		log.Error().Err(err).Str("device_id", cred.DeviceID).Msg("failed to persist credential")
@@ -223,9 +278,9 @@ func (s *credentialStore) AddCredential(cred *DeviceCredential) error {
 	return nil
 }
 
-// RegisterDevice creates a new credential for a device. If device_id is empty, one is generated.
+// RegisterDevice creates a new credential for a device with optional metadata.
 // Returns the plain-text token (shown only once; caller must persist it).
-func (s *credentialStore) RegisterDevice(deviceID string) (*DeviceCredential, error) {
+func (s *credentialStore) RegisterDevice(deviceID, deviceName, deviceIP, deviceMAC string) (*DeviceCredential, error) {
 	token, err := generateToken()
 	if err != nil {
 		return nil, err
@@ -239,38 +294,75 @@ func (s *credentialStore) RegisterDevice(deviceID string) (*DeviceCredential, er
 		return nil, fmt.Errorf("hash token: %w", err)
 	}
 
+	rec := &deviceRecord{
+		TokenHash:    string(hash),
+		DeviceName:   deviceName,
+		DeviceIP:     deviceIP,
+		DeviceMAC:    deviceMAC,
+		RegisteredAt: time.Now().UTC().Format(time.RFC3339),
+	}
 	s.mu.Lock()
-	s.tokens[deviceID] = string(hash)
+	s.devices[deviceID] = rec
 	s.mu.Unlock()
 	if err := s.save(); err != nil {
 		log.Error().Err(err).Str("device_id", deviceID).Msg("failed to persist credential after registration")
 	}
 
-	return &DeviceCredential{DeviceID: deviceID, Token: token}, nil
+	return &DeviceCredential{
+		DeviceID:   deviceID,
+		Token:      token,
+		DeviceName: deviceName,
+		DeviceIP:   deviceIP,
+		DeviceMAC:  deviceMAC,
+	}, nil
 }
 
 // Count returns the number of registered devices (for logging)
 func (s *credentialStore) Count() int {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	return len(s.tokens)
+	return len(s.devices)
 }
 
 // ValidateToken returns true if the token matches the device's stored bcrypt hash.
 func (s *credentialStore) ValidateToken(deviceID, token string) bool {
 	s.mu.RLock()
-	hash, ok := s.tokens[deviceID]
+	rec, ok := s.devices[deviceID]
 	s.mu.RUnlock()
-	if !ok {
+	if !ok || rec == nil {
 		return false
 	}
-	return bcrypt.CompareHashAndPassword([]byte(hash), []byte(token)) == nil
+	return bcrypt.CompareHashAndPassword([]byte(rec.TokenHash), []byte(token)) == nil
+}
+
+// GetDeviceRecord returns a copy of the device record, or nil if not found.
+func (s *credentialStore) GetDeviceRecord(deviceID string) *deviceRecord {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	rec, ok := s.devices[deviceID]
+	if !ok || rec == nil {
+		return nil
+	}
+	cp := *rec
+	return &cp
+}
+
+// ListAllDeviceRecords returns all device_id -> record pairs (for the list endpoint).
+func (s *credentialStore) ListAllDeviceRecords() map[string]*deviceRecord {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := make(map[string]*deviceRecord, len(s.devices))
+	for k, v := range s.devices {
+		cp := *v
+		out[k] = &cp
+	}
+	return out
 }
 
 // RevokeDevice removes a device's credential
 func (s *credentialStore) RevokeDevice(deviceID string) {
 	s.mu.Lock()
-	delete(s.tokens, deviceID)
+	delete(s.devices, deviceID)
 	s.mu.Unlock()
 	if err := s.save(); err != nil {
 		log.Error().Err(err).Str("device_id", deviceID).Msg("failed to persist credential removal")

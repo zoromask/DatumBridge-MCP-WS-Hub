@@ -7,16 +7,19 @@ import (
 	"time"
 )
 
-func TestRegisterAndGet(t *testing.T) {
-	h := &Hub{
+func newTestHub() *Hub {
+	return &Hub{
 		conns:        make(map[string]*Conn),
 		pending:      make(map[string]*pendingReq),
 		creds:        newCredentialStore(""),
 		pairingStore: newPairingStore(),
 	}
+}
 
+func TestRegisterAndGet(t *testing.T) {
+	h := newTestHub()
 	send := make(chan []byte, 1)
-	h.Register("dev-1", send)
+	h.Register("dev-1", send, "127.0.0.1:5000")
 
 	c := h.Get("dev-1")
 	if c == nil {
@@ -25,23 +28,19 @@ func TestRegisterAndGet(t *testing.T) {
 	if c.DeviceID != "dev-1" {
 		t.Fatalf("expected device_id=dev-1, got %s", c.DeviceID)
 	}
+	if c.ConnectedIP != "127.0.0.1:5000" {
+		t.Fatalf("expected connected_ip=127.0.0.1:5000, got %s", c.ConnectedIP)
+	}
 }
 
 func TestRegisterReplacesOld(t *testing.T) {
-	h := &Hub{
-		conns:        make(map[string]*Conn),
-		pending:      make(map[string]*pendingReq),
-		creds:        newCredentialStore(""),
-		pairingStore: newPairingStore(),
-	}
-
+	h := newTestHub()
 	old := make(chan []byte, 1)
-	h.Register("dev-1", old)
+	h.Register("dev-1", old, "")
 
 	newCh := make(chan []byte, 1)
-	h.Register("dev-1", newCh)
+	h.Register("dev-1", newCh, "")
 
-	// Old channel should be closed
 	select {
 	case _, ok := <-old:
 		if ok {
@@ -53,22 +52,15 @@ func TestRegisterReplacesOld(t *testing.T) {
 }
 
 func TestUnregister(t *testing.T) {
-	h := &Hub{
-		conns:        make(map[string]*Conn),
-		pending:      make(map[string]*pendingReq),
-		creds:        newCredentialStore(""),
-		pairingStore: newPairingStore(),
-	}
-
+	h := newTestHub()
 	send := make(chan []byte, 1)
-	h.Register("dev-1", send)
+	h.Register("dev-1", send, "")
 	h.Unregister("dev-1")
 
 	if h.Get("dev-1") != nil {
 		t.Fatal("expected nil after unregister")
 	}
 
-	// Channel should be closed
 	select {
 	case _, ok := <-send:
 		if ok {
@@ -80,17 +72,10 @@ func TestUnregister(t *testing.T) {
 }
 
 func TestUnregisterCancelsPending(t *testing.T) {
-	h := &Hub{
-		conns:        make(map[string]*Conn),
-		pending:      make(map[string]*pendingReq),
-		creds:        newCredentialStore(""),
-		pairingStore: newPairingStore(),
-	}
-
+	h := newTestHub()
 	send := make(chan []byte, 16)
-	h.Register("dev-1", send)
+	h.Register("dev-1", send, "")
 
-	// Create a pending request manually
 	ch := make(chan []byte, 1)
 	h.pendingMu.Lock()
 	h.pending["dev-1|42"] = &pendingReq{
@@ -101,7 +86,6 @@ func TestUnregisterCancelsPending(t *testing.T) {
 
 	h.Unregister("dev-1")
 
-	// Pending channel should be closed
 	select {
 	case _, ok := <-ch:
 		if ok {
@@ -119,16 +103,10 @@ func TestUnregisterCancelsPending(t *testing.T) {
 }
 
 func TestListDeviceIDs(t *testing.T) {
-	h := &Hub{
-		conns:        make(map[string]*Conn),
-		pending:      make(map[string]*pendingReq),
-		creds:        newCredentialStore(""),
-		pairingStore: newPairingStore(),
-	}
-
-	h.Register("a", make(chan []byte, 1))
-	h.Register("b", make(chan []byte, 1))
-	h.Register("c", make(chan []byte, 1))
+	h := newTestHub()
+	h.Register("a", make(chan []byte, 1), "")
+	h.Register("b", make(chan []byte, 1), "")
+	h.Register("c", make(chan []byte, 1), "")
 
 	ids := h.ListDeviceIDs()
 	if len(ids) != 3 {
@@ -136,16 +114,52 @@ func TestListDeviceIDs(t *testing.T) {
 	}
 }
 
-func TestForwardAndDeliver(t *testing.T) {
-	h := &Hub{
-		conns:        make(map[string]*Conn),
-		pending:      make(map[string]*pendingReq),
-		creds:        newCredentialStore(""),
-		pairingStore: newPairingStore(),
+func TestListDeviceInfos(t *testing.T) {
+	h := newTestHub()
+
+	// Register a device credential with metadata
+	h.creds.RegisterDevice("dev-1", "MacBook-Pro", "192.168.1.10", "AA:BB:CC:DD:EE:FF")
+
+	// Connect dev-1
+	h.Register("dev-1", make(chan []byte, 1), "10.0.0.5:9999")
+
+	// Register another credential but don't connect
+	h.creds.RegisterDevice("dev-2", "Ubuntu-Server", "192.168.1.20", "11:22:33:44:55:66")
+
+	infos := h.ListDeviceInfos()
+	if len(infos) != 2 {
+		t.Fatalf("expected 2 device infos, got %d", len(infos))
 	}
 
+	infoMap := make(map[string]DeviceInfo)
+	for _, i := range infos {
+		infoMap[i.DeviceID] = i
+	}
+
+	d1 := infoMap["dev-1"]
+	if d1.DeviceName != "MacBook-Pro" {
+		t.Fatalf("expected MacBook-Pro, got %s", d1.DeviceName)
+	}
+	if !d1.Connected {
+		t.Fatal("dev-1 should be connected")
+	}
+	if d1.ConnectedIP != "10.0.0.5:9999" {
+		t.Fatalf("expected connected_ip=10.0.0.5:9999, got %s", d1.ConnectedIP)
+	}
+
+	d2 := infoMap["dev-2"]
+	if d2.DeviceName != "Ubuntu-Server" {
+		t.Fatalf("expected Ubuntu-Server, got %s", d2.DeviceName)
+	}
+	if d2.Connected {
+		t.Fatal("dev-2 should not be connected")
+	}
+}
+
+func TestForwardAndDeliver(t *testing.T) {
+	h := newTestHub()
 	send := make(chan []byte, 16)
-	h.Register("dev-1", send)
+	h.Register("dev-1", send, "")
 
 	req := `{"jsonrpc":"2.0","id":7,"method":"tools/list","params":{}}`
 	resp := `{"jsonrpc":"2.0","id":7,"result":{"tools":[]}}`
@@ -161,7 +175,6 @@ func TestForwardAndDeliver(t *testing.T) {
 		got, gotOK = h.ForwardRequest("dev-1", []byte(req), 5*time.Second)
 	}()
 
-	// Simulate device: read from send channel, deliver response
 	msg := <-send
 	var parsed struct {
 		ID interface{} `json:"id"`
@@ -182,13 +195,7 @@ func TestForwardAndDeliver(t *testing.T) {
 }
 
 func TestForwardRequestNoDevice(t *testing.T) {
-	h := &Hub{
-		conns:        make(map[string]*Conn),
-		pending:      make(map[string]*pendingReq),
-		creds:        newCredentialStore(""),
-		pairingStore: newPairingStore(),
-	}
-
+	h := newTestHub()
 	req := `{"jsonrpc":"2.0","id":1,"method":"ping","params":{}}`
 	_, ok := h.ForwardRequest("nonexistent", []byte(req), time.Second)
 	if ok {
@@ -197,15 +204,9 @@ func TestForwardRequestNoDevice(t *testing.T) {
 }
 
 func TestForwardRequestTimeout(t *testing.T) {
-	h := &Hub{
-		conns:        make(map[string]*Conn),
-		pending:      make(map[string]*pendingReq),
-		creds:        newCredentialStore(""),
-		pairingStore: newPairingStore(),
-	}
-
+	h := newTestHub()
 	send := make(chan []byte, 16)
-	h.Register("dev-1", send)
+	h.Register("dev-1", send, "")
 
 	req := `{"jsonrpc":"2.0","id":99,"method":"slow","params":{}}`
 	_, ok := h.ForwardRequest("dev-1", []byte(req), 100*time.Millisecond)
@@ -215,26 +216,17 @@ func TestForwardRequestTimeout(t *testing.T) {
 }
 
 func TestForwardRequestDuplicateID(t *testing.T) {
-	h := &Hub{
-		conns:        make(map[string]*Conn),
-		pending:      make(map[string]*pendingReq),
-		creds:        newCredentialStore(""),
-		pairingStore: newPairingStore(),
-	}
-
+	h := newTestHub()
 	send := make(chan []byte, 16)
-	h.Register("dev-1", send)
+	h.Register("dev-1", send, "")
 
 	req := `{"jsonrpc":"2.0","id":1,"method":"test","params":{}}`
 
-	// First request: will block waiting for response
 	go func() {
 		h.ForwardRequest("dev-1", []byte(req), 5*time.Second)
 	}()
-	// Drain the forwarded message
 	<-send
 
-	// Second request with same id should fail (duplicate)
 	_, ok := h.ForwardRequest("dev-1", []byte(req), time.Second)
 	if ok {
 		t.Fatal("expected duplicate request ID to fail")

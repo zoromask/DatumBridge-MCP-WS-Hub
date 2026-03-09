@@ -105,6 +105,7 @@
     <select id="tool-select">
       <option value="">— Select device first —</option>
     </select>
+    <div id="tool-description" style="margin-top:0.25rem;font-size:0.75rem;color:#a1a1aa;display:none;"></div>
     <label style="margin-top: 0.5rem;">MCP Method</label>
     <select id="mcp-method">
       <option value="initialize">initialize</option>
@@ -124,21 +125,78 @@
   <script>
     const base = window.location.origin;
 
-    const toolTemplates = {
-      file_read: { path: "README.md", offset: 1, limit: 50 },
-      file_edit: { path: "example.txt", old_string: "old text", new_string: "new text" },
-      file_write: { path: "output.txt", content: "Hello, world!" },
-      pdf_read: { path: "document.pdf", max_chars: 10000 },
-      shell: { command: "echo hello" },
-      memory_recall: { query: "search term", limit: 5 },
-      memory_store: { key: "test_note", content: "Note to remember" },
-      web_fetch: { url: "https://example.com" },
-      web_search: { query: "search query" },
-      browser: { action: "open", url: "https://example.com" },
-      browser_open: { url: "https://example.com" }
-    };
-
     let cachedTools = [];
+
+    function sampleValue(name, prop) {
+      const t = prop.type;
+      const desc = (prop.description || '').toLowerCase();
+      const n = name.toLowerCase();
+      if (t === 'boolean') return true;
+      if (t === 'integer' || t === 'number') {
+        if (n.includes('limit') || n.includes('count') || n.includes('max')) return 10;
+        if (n.includes('offset') || n.includes('start')) return 0;
+        if (n.includes('timeout')) return 30;
+        return 1;
+      }
+      if (t === 'array') return prop.items ? [sampleValue('item', prop.items)] : [];
+      if (t === 'object') return {};
+      if (n === 'path' || n === 'file' || n === 'filepath' || n === 'file_path') return 'README.md';
+      if (n === 'command' || n === 'cmd') return 'echo hello';
+      if (n.includes('url')) return 'https://example.com';
+      if (n === 'query' || n === 'search' || n.includes('search')) return 'search term';
+      if (n === 'content' || n === 'text' || n === 'body') return 'Hello, world!';
+      if (n === 'key' || n === 'name') return 'example';
+      if (n === 'old_string') return 'old text';
+      if (n === 'new_string') return 'new text';
+      if (n === 'action') return prop.enum ? prop.enum[0] : 'run';
+      if (prop.enum && prop.enum.length) return prop.enum[0];
+      if (prop.default !== undefined) return prop.default;
+      const hint = prop.description || name;
+      return '<' + hint.slice(0, 60) + '>';
+    }
+
+    function argsForTool(toolName) {
+      const tool = cachedTools.find(t => t.name === toolName);
+      if (!tool || !tool.inputSchema || !tool.inputSchema.properties) return {};
+      const props = tool.inputSchema.properties;
+      const required = tool.inputSchema.required || [];
+      const args = {};
+      for (const [k, v] of Object.entries(props)) {
+        args[k] = sampleValue(k, v);
+      }
+      return args;
+    }
+
+    function updateToolDescription() {
+      const el = document.getElementById('tool-description');
+      const toolName = document.getElementById('tool-select').value;
+      const tool = cachedTools.find(t => t.name === toolName);
+      if (!tool) { el.style.display = 'none'; return; }
+      const props = tool.inputSchema?.properties || {};
+      const required = tool.inputSchema?.required || [];
+      let html = '<div style="margin-top:0.25rem;padding:0.5rem;background:#1e1e22;border-radius:6px;border:1px solid #27272a;">';
+      html += '<div style="color:#e4e4e7;font-weight:600;margin-bottom:0.25rem;">' + tool.name + '</div>';
+      if (tool.description) html += '<div style="margin-bottom:0.5rem;">' + tool.description + '</div>';
+      const keys = Object.keys(props);
+      if (keys.length) {
+        html += '<div style="margin-top:0.25rem;border-top:1px solid #27272a;padding-top:0.25rem;">';
+        keys.forEach(k => {
+          const p = props[k];
+          const req = required.includes(k);
+          const typeStr = p.type || 'any';
+          const enumStr = p.enum ? ' [' + p.enum.join(', ') + ']' : '';
+          html += '<div style="margin:0.125rem 0;"><code style="color:#60a5fa;">' + k + '</code>';
+          html += ' <span style="color:#71717a;">' + typeStr + enumStr + '</span>';
+          if (req) html += ' <span style="color:#f87171;font-size:0.625rem;">required</span>';
+          if (p.description) html += ' — ' + p.description;
+          html += '</div>';
+        });
+        html += '</div>';
+      }
+      html += '</div>';
+      el.innerHTML = html;
+      el.style.display = 'block';
+    }
 
     async function fetchToolsList(deviceId) {
       if (!deviceId) return;
@@ -169,42 +227,82 @@
       const j = await r.json();
       const list = document.getElementById('devices-list');
       list.innerHTML = '';
-      (j.devices || []).forEach(d => {
-        const wrap = document.createElement('span');
-        wrap.style.display = 'inline-flex';
-        wrap.style.alignItems = 'center';
-        wrap.style.gap = '0.5rem';
-        wrap.style.margin = '0.25rem';
-        const label = document.createElement('span');
-        label.textContent = d;
+      const devices = j.devices || [];
+      if (devices.length === 0) {
+        list.innerHTML = '<p style="color:#71717a;font-size:0.875rem;">No devices registered yet.</p>';
+        return;
+      }
+      devices.forEach(d => {
+        const id = typeof d === 'string' ? d : d.device_id;
+        const name = d.device_name || '';
+        const ip = d.device_ip || '';
+        const mac = d.device_mac || '';
+        const connected = d.connected || false;
+        const connIP = d.connected_ip || '';
+        const connAt = d.connected_at || '';
+
+        const row = document.createElement('div');
+        row.style.cssText = 'display:flex;align-items:center;gap:0.75rem;padding:0.5rem 0.5rem;border-bottom:1px solid #27272a;font-size:0.875rem;';
+
+        const status = document.createElement('span');
+        status.style.cssText = `width:8px;height:8px;border-radius:50%;flex-shrink:0;background:${connected ? '#22c55e' : '#71717a'};`;
+        status.title = connected ? 'Connected' : 'Offline';
+
+        const info = document.createElement('div');
+        info.style.cssText = 'flex:1;min-width:0;';
+        const line1 = document.createElement('div');
+        line1.style.cssText = 'font-weight:600;display:flex;align-items:center;gap:0.5rem;';
+        line1.innerHTML = `<span>${name || id}</span>`;
+        if (name) {
+          const idTag = document.createElement('span');
+          idTag.style.cssText = 'font-size:0.75rem;color:#71717a;font-weight:400;';
+          idTag.textContent = id;
+          line1.appendChild(idTag);
+        }
+        info.appendChild(line1);
+        const line2 = document.createElement('div');
+        line2.style.cssText = 'font-size:0.75rem;color:#a1a1aa;margin-top:0.125rem;';
+        const parts = [];
+        if (ip) parts.push('IP: ' + ip);
+        if (mac) parts.push('MAC: ' + mac);
+        if (connected && connIP) parts.push('Connected from: ' + connIP);
+        if (connected && connAt) parts.push('Since: ' + new Date(connAt).toLocaleString());
+        line2.textContent = parts.join(' · ');
+        if (parts.length) info.appendChild(line2);
+
+        const actions = document.createElement('div');
+        actions.style.cssText = 'display:flex;gap:0.25rem;flex-shrink:0;';
         const callBtn = document.createElement('button');
         callBtn.textContent = 'Call';
         callBtn.className = 'primary';
-        callBtn.style.fontSize = '0.75rem';
-        callBtn.style.padding = '0.25rem 0.5rem';
+        callBtn.style.cssText = 'font-size:0.75rem;padding:0.25rem 0.5rem;';
+        callBtn.disabled = !connected;
+        if (!connected) callBtn.style.opacity = '0.4';
         callBtn.onclick = () => {
-          document.getElementById('target-device').value = d;
-          fetchToolsList(d);
+          document.getElementById('target-device').value = id;
+          fetchToolsList(id);
         };
         const revokeBtn = document.createElement('button');
         revokeBtn.textContent = 'Revoke';
         revokeBtn.className = 'danger';
-        revokeBtn.style.fontSize = '0.75rem';
-        revokeBtn.style.padding = '0.25rem 0.5rem';
+        revokeBtn.style.cssText = 'font-size:0.75rem;padding:0.25rem 0.5rem;';
         revokeBtn.onclick = async () => {
-          if (!confirm(`Revoke device "${d}"? It will be disconnected and must re-register to connect again.`)) return;
+          if (!confirm(`Revoke device "${name || id}"? It will be disconnected and must re-register.`)) return;
           try {
-            const dr = await fetch(`${base}/api/v1/devices/${encodeURIComponent(d)}`, { method: 'DELETE' });
+            const dr = await fetch(`${base}/api/v1/devices/${encodeURIComponent(id)}`, { method: 'DELETE' });
             if (dr.ok) refreshDevices();
             else alert('Failed to revoke: ' + (await dr.text()));
           } catch (e) {
             alert('Error: ' + e.message);
           }
         };
-        wrap.appendChild(label);
-        wrap.appendChild(callBtn);
-        wrap.appendChild(revokeBtn);
-        list.appendChild(wrap);
+        actions.appendChild(callBtn);
+        actions.appendChild(revokeBtn);
+
+        row.appendChild(status);
+        row.appendChild(info);
+        row.appendChild(actions);
+        list.appendChild(row);
       });
     }
 
@@ -233,20 +331,22 @@
           body = '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}';
           document.getElementById('mcp-method').value = 'tools/list';
         } else if (action === 'send-file-read') {
+          const fileArgs = argsForTool('file_read');
           body = JSON.stringify({
             jsonrpc: '2.0',
             id: 3,
             method: 'tools/call',
-            params: { name: 'file_read', arguments: { path: 'README.md', offset: 1, limit: 50 } }
+            params: { name: 'file_read', arguments: Object.keys(fileArgs).length ? fileArgs : { path: 'README.md' } }
           }, null, 2);
           document.getElementById('mcp-method').value = 'tools/call';
           document.getElementById('tool-select').value = 'file_read';
         } else {
+          const memArgs = argsForTool('memory_recall');
           body = JSON.stringify({
             jsonrpc: '2.0',
             id: 3,
             method: 'tools/call',
-            params: { name: 'memory_recall', arguments: { query: 'test', limit: 5 } }
+            params: { name: 'memory_recall', arguments: Object.keys(memArgs).length ? memArgs : { query: 'test', limit: 5 } }
           }, null, 2);
           document.getElementById('mcp-method').value = 'tools/call';
           document.getElementById('tool-select').value = 'memory_recall';
@@ -314,7 +414,7 @@
       const tool = document.getElementById('tool-select').value;
       const method = document.getElementById('mcp-method').value;
       if (tool && method === 'tools/call') {
-        const args = toolTemplates[tool] || { path: "example.txt" };
+        const args = argsForTool(tool);
         document.getElementById('mcp-body').value = JSON.stringify({
           jsonrpc: '2.0',
           id: 3,
@@ -322,6 +422,7 @@
           params: { name: tool, arguments: args }
         }, null, 2);
       }
+      updateToolDescription();
     };
 
     document.getElementById('mcp-method').onchange = () => {
@@ -333,7 +434,7 @@
       } else if (m === 'tools/list') {
         body.value = '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}';
       } else if (m === 'tools/call' && tool) {
-        const args = toolTemplates[tool] || { path: "example.txt" };
+        const args = argsForTool(tool);
         body.value = JSON.stringify({
           jsonrpc: '2.0',
           id: 3,
@@ -341,7 +442,7 @@
           params: { name: tool, arguments: args }
         }, null, 2);
       } else if (m === 'tools/call') {
-        body.value = '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"file_read","arguments":{"path":"README.md"}}}';
+        body.value = '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"tool_name","arguments":{}}}';
       }
     };
 

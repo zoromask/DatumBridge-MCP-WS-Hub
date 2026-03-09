@@ -11,11 +11,24 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-
 // Conn represents a registered device WebSocket connection
 type Conn struct {
-	DeviceID string
-	Send     chan []byte // requests to forward to device
+	DeviceID    string
+	Send        chan []byte
+	ConnectedIP string
+	ConnectedAt time.Time
+}
+
+// DeviceInfo is the combined view of a device (persisted metadata + live connection state).
+type DeviceInfo struct {
+	DeviceID     string `json:"device_id"`
+	DeviceName   string `json:"device_name,omitempty"`
+	DeviceIP     string `json:"device_ip,omitempty"`
+	DeviceMAC    string `json:"device_mac,omitempty"`
+	RegisteredAt string `json:"registered_at,omitempty"`
+	Connected    bool   `json:"connected"`
+	ConnectedIP  string `json:"connected_ip,omitempty"`
+	ConnectedAt  string `json:"connected_at,omitempty"`
 }
 
 // pendingReq holds a waiting HTTP request for a JSON-RPC response
@@ -60,15 +73,17 @@ func New() *Hub {
 }
 
 // Register adds a device connection. Replaces existing connection for same device_id.
-func (h *Hub) Register(deviceID string, send chan []byte) {
+func (h *Hub) Register(deviceID string, send chan []byte, connectedIP string) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	if old, ok := h.conns[deviceID]; ok {
 		close(old.Send)
 	}
 	h.conns[deviceID] = &Conn{
-		DeviceID: deviceID,
-		Send:     send,
+		DeviceID:    deviceID,
+		Send:        send,
+		ConnectedIP: connectedIP,
+		ConnectedAt: time.Now().UTC(),
 	}
 }
 
@@ -117,10 +132,54 @@ func (h *Hub) ListDeviceIDs() []string {
 	return ids
 }
 
+// ListDeviceInfos returns detailed info for all registered devices,
+// merging persisted metadata with live connection state.
+func (h *Hub) ListDeviceInfos() []DeviceInfo {
+	allRecords := h.creds.ListAllDeviceRecords()
+
+	h.mu.RLock()
+	connsCopy := make(map[string]*Conn, len(h.conns))
+	for k, v := range h.conns {
+		connsCopy[k] = v
+	}
+	h.mu.RUnlock()
+
+	// Merge: start from all registered devices, then overlay connection status
+	seen := make(map[string]bool)
+	var out []DeviceInfo
+	for id, rec := range allRecords {
+		seen[id] = true
+		info := DeviceInfo{
+			DeviceID:     id,
+			DeviceName:   rec.DeviceName,
+			DeviceIP:     rec.DeviceIP,
+			DeviceMAC:    rec.DeviceMAC,
+			RegisteredAt: rec.RegisteredAt,
+		}
+		if conn, ok := connsCopy[id]; ok {
+			info.Connected = true
+			info.ConnectedIP = conn.ConnectedIP
+			info.ConnectedAt = conn.ConnectedAt.Format(time.RFC3339)
+		}
+		out = append(out, info)
+	}
+	// Include any connected devices that somehow don't have a persisted record
+	for id, conn := range connsCopy {
+		if !seen[id] {
+			out = append(out, DeviceInfo{
+				DeviceID:    id,
+				Connected:   true,
+				ConnectedIP: conn.ConnectedIP,
+				ConnectedAt: conn.ConnectedAt.Format(time.RFC3339),
+			})
+		}
+	}
+	return out
+}
+
 // ForwardRequest sends a JSON-RPC request to the device and waits for the response.
 // Returns the response body or error. Timeout after timeoutDur.
 func (h *Hub) ForwardRequest(deviceID string, payload []byte, timeoutDur time.Duration) ([]byte, bool) {
-	// Extract id from request for correlation
 	var req struct {
 		ID interface{} `json:"id"`
 	}

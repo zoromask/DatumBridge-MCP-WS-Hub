@@ -1,6 +1,7 @@
 package hub
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -9,7 +10,7 @@ import (
 func TestRegisterDeviceAndValidate(t *testing.T) {
 	s := newCredentialStore("")
 
-	cred, err := s.RegisterDevice("test-dev")
+	cred, err := s.RegisterDevice("test-dev", "TestPC", "10.0.0.1", "AA:BB:CC:DD:EE:FF")
 	if err != nil {
 		t.Fatalf("RegisterDevice failed: %v", err)
 	}
@@ -18,6 +19,9 @@ func TestRegisterDeviceAndValidate(t *testing.T) {
 	}
 	if cred.Token == "" {
 		t.Fatal("expected non-empty token")
+	}
+	if cred.DeviceName != "TestPC" {
+		t.Fatalf("expected device_name=TestPC, got %s", cred.DeviceName)
 	}
 
 	if !s.ValidateToken("test-dev", cred.Token) {
@@ -28,7 +32,7 @@ func TestRegisterDeviceAndValidate(t *testing.T) {
 func TestValidateWrongToken(t *testing.T) {
 	s := newCredentialStore("")
 
-	cred, _ := s.RegisterDevice("dev-1")
+	cred, _ := s.RegisterDevice("dev-1", "", "", "")
 	if s.ValidateToken("dev-1", cred.Token+"wrong") {
 		t.Fatal("expected wrong token to fail validation")
 	}
@@ -44,7 +48,7 @@ func TestValidateNonexistentDevice(t *testing.T) {
 func TestRevokeDevice(t *testing.T) {
 	s := newCredentialStore("")
 
-	cred, _ := s.RegisterDevice("dev-1")
+	cred, _ := s.RegisterDevice("dev-1", "", "", "")
 	s.RevokeDevice("dev-1")
 
 	if s.ValidateToken("dev-1", cred.Token) {
@@ -58,7 +62,7 @@ func TestRevokeDevice(t *testing.T) {
 func TestRegisterDeviceAutoID(t *testing.T) {
 	s := newCredentialStore("")
 
-	cred, err := s.RegisterDevice("")
+	cred, err := s.RegisterDevice("", "", "", "")
 	if err != nil {
 		t.Fatalf("RegisterDevice failed: %v", err)
 	}
@@ -74,20 +78,32 @@ func TestPersistence(t *testing.T) {
 	dir := t.TempDir()
 	fp := filepath.Join(dir, "creds.json")
 
-	// Register a device and persist
 	s1 := newCredentialStore(fp)
-	cred, err := s1.RegisterDevice("persist-dev")
+	cred, err := s1.RegisterDevice("persist-dev", "MyLaptop", "192.168.1.5", "11:22:33:44:55:66")
 	if err != nil {
 		t.Fatalf("RegisterDevice failed: %v", err)
 	}
 
-	// Load from same file
 	s2 := newCredentialStore(fp)
 	if s2.Count() != 1 {
 		t.Fatalf("expected 1 device after reload, got %d", s2.Count())
 	}
 	if !s2.ValidateToken("persist-dev", cred.Token) {
 		t.Fatal("expected token to validate after reload")
+	}
+
+	rec := s2.GetDeviceRecord("persist-dev")
+	if rec == nil {
+		t.Fatal("expected device record")
+	}
+	if rec.DeviceName != "MyLaptop" {
+		t.Fatalf("expected device_name=MyLaptop, got %s", rec.DeviceName)
+	}
+	if rec.DeviceIP != "192.168.1.5" {
+		t.Fatalf("expected device_ip=192.168.1.5, got %s", rec.DeviceIP)
+	}
+	if rec.DeviceMAC != "11:22:33:44:55:66" {
+		t.Fatalf("expected device_mac=11:22:33:44:55:66, got %s", rec.DeviceMAC)
 	}
 }
 
@@ -96,8 +112,8 @@ func TestPersistenceRevoke(t *testing.T) {
 	fp := filepath.Join(dir, "creds.json")
 
 	s := newCredentialStore(fp)
-	s.RegisterDevice("dev-a")
-	s.RegisterDevice("dev-b")
+	s.RegisterDevice("dev-a", "", "", "")
+	s.RegisterDevice("dev-b", "", "", "")
 	s.RevokeDevice("dev-a")
 
 	s2 := newCredentialStore(fp)
@@ -110,13 +126,12 @@ func TestMigratePlainTextTokens(t *testing.T) {
 	dir := t.TempDir()
 	fp := filepath.Join(dir, "creds.json")
 
-	// Write a plain-text token file (simulating old format)
+	// Old format: map[string]string (device_id -> plain token)
 	data := []byte(`{"old-device": "plain-text-token-value"}`)
 	if err := os.WriteFile(fp, data, 0600); err != nil {
 		t.Fatal(err)
 	}
 
-	// Load — should migrate to bcrypt
 	s := newCredentialStore(fp)
 	if s.Count() != 1 {
 		t.Fatalf("expected 1 device, got %d", s.Count())
@@ -125,12 +140,40 @@ func TestMigratePlainTextTokens(t *testing.T) {
 		t.Fatal("expected migrated token to still validate with original value")
 	}
 
-	// Verify the stored value is now a bcrypt hash
-	s.mu.RLock()
-	stored := s.tokens["old-device"]
-	s.mu.RUnlock()
-	if !isBcryptHash(stored) {
-		t.Fatalf("expected bcrypt hash after migration, got %s", stored)
+	rec := s.GetDeviceRecord("old-device")
+	if rec == nil {
+		t.Fatal("expected device record after migration")
+	}
+	if !isBcryptHash(rec.TokenHash) {
+		t.Fatalf("expected bcrypt hash after migration, got %s", rec.TokenHash)
+	}
+}
+
+func TestNewFormatPersistence(t *testing.T) {
+	dir := t.TempDir()
+	fp := filepath.Join(dir, "creds.json")
+
+	s1 := newCredentialStore(fp)
+	s1.RegisterDevice("dev-new", "Desktop-PC", "10.10.10.1", "AA:11:BB:22:CC:33")
+
+	// Read raw file to verify format
+	raw, err := os.ReadFile(fp)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var parsed map[string]*deviceRecord
+	if err := json.Unmarshal(raw, &parsed); err != nil {
+		t.Fatalf("expected new format JSON, got error: %v", err)
+	}
+	rec := parsed["dev-new"]
+	if rec == nil {
+		t.Fatal("expected dev-new in file")
+	}
+	if rec.DeviceName != "Desktop-PC" {
+		t.Fatalf("expected device_name=Desktop-PC in file, got %s", rec.DeviceName)
+	}
+	if !isBcryptHash(rec.TokenHash) {
+		t.Fatalf("expected bcrypt hash, got %s", rec.TokenHash)
 	}
 }
 
@@ -151,13 +194,11 @@ func TestPairingFlow(t *testing.T) {
 
 	ps.Add(code, cred)
 
-	// List should show 1 pending
 	pending := ps.List()
 	if len(pending) != 1 {
 		t.Fatalf("expected 1 pending pairing, got %d", len(pending))
 	}
 
-	// Consume
 	consumed, ok := ps.Consume(code)
 	if !ok {
 		t.Fatal("expected Consume to succeed")
@@ -166,10 +207,47 @@ func TestPairingFlow(t *testing.T) {
 		t.Fatalf("expected device_id=pair-dev, got %s", consumed.DeviceID)
 	}
 
-	// Second consume should fail
 	_, ok = ps.Consume(code)
 	if ok {
 		t.Fatal("expected second Consume to fail")
+	}
+}
+
+func TestPairingWithMetadata(t *testing.T) {
+	s := newCredentialStore("")
+	ps := newPairingStore()
+
+	code, cred, err := s.StartPairing("meta-dev")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ps.Add(code, cred)
+	consumed, ok := ps.Consume(code)
+	if !ok {
+		t.Fatal("expected Consume to succeed")
+	}
+
+	consumed.DeviceName = "TestMachine"
+	consumed.DeviceIP = "192.168.0.100"
+	consumed.DeviceMAC = "FF:EE:DD:CC:BB:AA"
+
+	if err := s.AddCredential(consumed); err != nil {
+		t.Fatal(err)
+	}
+
+	rec := s.GetDeviceRecord("meta-dev")
+	if rec == nil {
+		t.Fatal("expected record")
+	}
+	if rec.DeviceName != "TestMachine" {
+		t.Fatalf("expected TestMachine, got %s", rec.DeviceName)
+	}
+	if rec.DeviceIP != "192.168.0.100" {
+		t.Fatalf("expected 192.168.0.100, got %s", rec.DeviceIP)
+	}
+	if rec.DeviceMAC != "FF:EE:DD:CC:BB:AA" {
+		t.Fatalf("expected FF:EE:DD:CC:BB:AA, got %s", rec.DeviceMAC)
 	}
 }
 
