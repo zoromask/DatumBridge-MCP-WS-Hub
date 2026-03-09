@@ -3,451 +3,751 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MCP WebSocket Hub — Test UI</title>
+  <title>DatumBridge Gateway</title>
   <style>
-    * { box-sizing: border-box; }
-    body { font-family: system-ui, sans-serif; margin: 0; padding: 1rem; background: #0f0f12; color: #e4e4e7; }
-    h1 { font-size: 1.25rem; margin: 0 0 1rem; color: #a1a1aa; }
-    section { margin-bottom: 1.5rem; }
-    .card { background: #18181b; border: 1px solid #27272a; border-radius: 8px; padding: 1rem; }
-    label { display: block; margin-bottom: 0.25rem; font-size: 0.875rem; color: #a1a1aa; }
-    input, select, textarea, button { padding: 0.5rem 0.75rem; border-radius: 6px; border: 1px solid #3f3f46; background: #27272a; color: #e4e4e7; font-size: 0.875rem; }
-    input { width: 100%; max-width: 240px; }
-    textarea { width: 100%; min-height: 120px; font-family: ui-monospace, monospace; resize: vertical; }
-    button { cursor: pointer; margin-right: 0.5rem; margin-top: 0.5rem; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: system-ui, -apple-system, sans-serif; background: #09090b; color: #e4e4e7; display: flex; height: 100vh; overflow: hidden; }
+
+    /* ── Sidebar ── */
+    .sidebar { width: 220px; background: #0f0f12; border-right: 1px solid #1e1e24; display: flex; flex-direction: column; flex-shrink: 0; }
+    .sidebar-brand { padding: 1.25rem 1rem 1rem; border-bottom: 1px solid #1e1e24; }
+    .sidebar-brand h1 { font-size: 0.9375rem; font-weight: 700; color: #e4e4e7; }
+    .sidebar-brand p { font-size: 0.6875rem; color: #52525b; margin-top: 0.125rem; }
+    .sidebar-nav { flex: 1; padding: 0.5rem; overflow-y: auto; }
+    .nav-item { display: flex; align-items: center; gap: 0.625rem; padding: 0.5rem 0.75rem; border-radius: 6px; font-size: 0.8125rem; color: #a1a1aa; cursor: pointer; transition: all 0.15s; text-decoration: none; }
+    .nav-item:hover { background: #18181b; color: #e4e4e7; }
+    .nav-item.active { background: #1e293b; color: #60a5fa; }
+    .nav-item svg { width: 16px; height: 16px; flex-shrink: 0; }
+    .nav-section { padding: 0.75rem 0.75rem 0.25rem; font-size: 0.625rem; text-transform: uppercase; letter-spacing: 0.08em; color: #3f3f46; font-weight: 600; }
+    .sidebar-footer { padding: 0.75rem 1rem; border-top: 1px solid #1e1e24; font-size: 0.6875rem; color: #3f3f46; }
+    .admin-badge { display: inline-block; background: #7c3aed; color: white; font-size: 0.5625rem; padding: 0.0625rem 0.375rem; border-radius: 9999px; margin-left: auto; font-weight: 600; }
+
+    /* ── Main content ── */
+    .main { flex: 1; overflow-y: auto; }
+    .page { display: none; padding: 1.5rem 2rem; max-width: 960px; }
+    .page.active { display: block; }
+    .page-title { font-size: 1.25rem; font-weight: 700; margin-bottom: 0.25rem; }
+    .page-subtitle { font-size: 0.8125rem; color: #71717a; margin-bottom: 1.5rem; }
+
+    /* ── Cards ── */
+    .card { background: #18181b; border: 1px solid #27272a; border-radius: 10px; padding: 1.25rem; margin-bottom: 1rem; }
+    .card-title { font-size: 0.9375rem; font-weight: 600; margin-bottom: 0.5rem; }
+
+    /* ── Forms ── */
+    label { display: block; margin-bottom: 0.25rem; font-size: 0.8125rem; color: #a1a1aa; }
+    input, select, textarea, button { padding: 0.5rem 0.75rem; border-radius: 6px; border: 1px solid #3f3f46; background: #27272a; color: #e4e4e7; font-size: 0.8125rem; }
+    input, select { width: 100%; }
+    textarea { width: 100%; min-height: 100px; font-family: ui-monospace, monospace; resize: vertical; }
+    button { cursor: pointer; }
     button:hover { background: #3f3f46; }
-    button.primary { background: #3b82f6; border-color: #3b82f6; color: white; }
-    button.primary:hover { background: #2563eb; }
-    button.danger { background: #dc2626; border-color: #dc2626; color: white; }
-    #devices-list { margin-top: 0.5rem; }
-    .flow-steps { display: flex; flex-direction: column; gap: 0.75rem; }
-    .flow-step { display: flex; gap: 0.75rem; align-items: flex-start; padding: 0.5rem 0; border-bottom: 1px solid #27272a; }
+    .btn { display: inline-flex; align-items: center; gap: 0.375rem; padding: 0.5rem 1rem; border-radius: 8px; font-size: 0.8125rem; font-weight: 500; border: none; cursor: pointer; transition: all 0.15s; }
+    .btn-primary { background: #3b82f6; color: white; }
+    .btn-primary:hover { background: #2563eb; }
+    .btn-success { background: #22c55e; color: white; }
+    .btn-success:hover { background: #16a34a; }
+    .btn-danger { background: #dc2626; color: white; }
+    .btn-danger:hover { background: #b91c1c; }
+    .btn-ghost { background: transparent; color: #a1a1aa; border: 1px solid #3f3f46; }
+    .btn-ghost:hover { background: #27272a; color: #e4e4e7; }
+    .btn-sm { padding: 0.25rem 0.625rem; font-size: 0.75rem; }
+
+    /* ── Device cards ── */
+    .device-card { display: flex; align-items: center; gap: 1rem; padding: 1rem; background: #111114; border: 1px solid #27272a; border-radius: 8px; margin-bottom: 0.5rem; }
+    .device-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .device-dot.online { background: #22c55e; box-shadow: 0 0 6px #22c55e44; }
+    .device-dot.offline { background: #52525b; }
+    .device-info { flex: 1; min-width: 0; }
+    .device-name { font-weight: 600; font-size: 0.9375rem; }
+    .device-meta { font-size: 0.75rem; color: #71717a; margin-top: 0.125rem; }
+    .device-actions { display: flex; gap: 0.375rem; flex-shrink: 0; }
+
+    /* ── Tool grid ── */
+    .tool-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.5rem; margin-top: 0.75rem; }
+    .tool-tile { background: #111114; border: 1px solid #27272a; border-radius: 8px; padding: 0.75rem; cursor: pointer; transition: all 0.15s; }
+    .tool-tile:hover { border-color: #3b82f6; background: #0f172a; }
+    .tool-tile.selected { border-color: #3b82f6; background: #1e293b; }
+    .tool-tile-name { font-weight: 600; font-size: 0.8125rem; margin-bottom: 0.25rem; }
+    .tool-tile-desc { font-size: 0.6875rem; color: #71717a; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+    /* ── Tool form ── */
+    .tool-form { margin-top: 1rem; }
+    .tool-form .field { margin-bottom: 0.75rem; }
+    .tool-form .field-label { font-size: 0.8125rem; font-weight: 500; color: #d4d4d8; margin-bottom: 0.1875rem; }
+    .tool-form .field-hint { font-size: 0.6875rem; color: #52525b; margin-bottom: 0.25rem; }
+    .tool-form .field-required { color: #f87171; font-size: 0.625rem; margin-left: 0.25rem; }
+
+    /* ── Task output ── */
+    .task-output { margin-top: 0.75rem; background: #111114; border: 1px solid #27272a; border-radius: 8px; padding: 0.75rem; font-family: ui-monospace, monospace; font-size: 0.75rem; white-space: pre-wrap; word-break: break-all; max-height: 400px; overflow-y: auto; color: #a1a1aa; }
+    .task-status { display: inline-flex; align-items: center; gap: 0.375rem; padding: 0.25rem 0.625rem; border-radius: 9999px; font-size: 0.6875rem; font-weight: 600; }
+    .task-status.running { background: #1e3a5f; color: #60a5fa; }
+    .task-status.completed { background: #14532d; color: #4ade80; }
+    .task-status.failed { background: #450a0a; color: #f87171; }
+    .task-status.idle { background: #27272a; color: #71717a; }
+
+    /* ── Flow guide ── */
+    .flow-steps { display: flex; flex-direction: column; gap: 0.5rem; }
+    .flow-step { display: flex; gap: 0.75rem; align-items: flex-start; padding: 0.75rem 0; border-bottom: 1px solid #1e1e24; }
     .flow-step:last-child { border-bottom: none; }
-    .step-num { flex-shrink: 0; width: 1.5rem; height: 1.5rem; display: inline-flex; align-items: center; justify-content: center; background: #3f3f46; border-radius: 50%; font-size: 0.75rem; font-weight: 600; }
-    .flow-step div { flex: 1; min-width: 0; }
-    .flow-step strong { font-size: 0.875rem; }
-    .step-desc { margin: 0.25rem 0 0.5rem; font-size: 0.8125rem; color: #a1a1aa; line-height: 1.4; }
-    .flow-step code { background: #27272a; padding: 0.125rem 0.375rem; border-radius: 4px; font-size: 0.75rem; }
-    .step-action { font-size: 0.75rem; padding: 0.25rem 0.5rem; margin-right: 0.25rem; margin-top: 0.25rem; }
+    .step-num { flex-shrink: 0; width: 1.5rem; height: 1.5rem; display: inline-flex; align-items: center; justify-content: center; background: #3f3f46; border-radius: 50%; font-size: 0.6875rem; font-weight: 700; }
+    .step-desc { margin: 0.25rem 0 0.5rem; font-size: 0.8125rem; color: #a1a1aa; line-height: 1.5; }
+    .step-desc code { background: #27272a; padding: 0.0625rem 0.375rem; border-radius: 4px; font-size: 0.75rem; }
+
+    /* ── Pairing display ── */
+    .pairing-code { font-size: 2rem; font-weight: 700; letter-spacing: 0.3em; color: #60a5fa; text-align: center; padding: 1rem; }
+
+    /* ── MCP Console ── */
+    .console-response { min-height: 100px; font-family: ui-monospace, monospace; font-size: 0.75rem; white-space: pre-wrap; word-break: break-all; background: #111114; border: 1px solid #27272a; border-radius: 8px; padding: 0.75rem; margin-top: 0.5rem; max-height: 500px; overflow-y: auto; }
+    .tool-info { margin-top: 0.375rem; padding: 0.625rem; background: #111114; border-radius: 6px; border: 1px solid #27272a; font-size: 0.75rem; color: #a1a1aa; }
+    .tool-info .tool-info-name { color: #e4e4e7; font-weight: 600; margin-bottom: 0.25rem; }
+    .tool-info code { color: #60a5fa; }
+    .tool-info .req { color: #f87171; font-size: 0.625rem; }
+
+    /* ── Misc ── */
+    .empty-state { text-align: center; color: #52525b; padding: 2rem; font-size: 0.875rem; }
+    .mb-1 { margin-bottom: 0.5rem; }
+    .mt-1 { margin-top: 0.5rem; }
+    .mt-2 { margin-top: 1rem; }
+    .gap-row { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
   </style>
 </head>
 <body>
-  <h1>MCP WebSocket Hub — Test UI</h1>
+  <!-- ════════════ SIDEBAR ════════════ -->
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <h1>DatumBridge</h1>
+      <p>Gateway Control Panel</p>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-section">Main</div>
+      <a class="nav-item active" data-page="gateway">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
+        Gateway
+      </a>
+      <div class="nav-section admin-only" style="display:none">Admin</div>
+      <a class="nav-item admin-only" data-page="devices" style="display:none">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        Devices
+        <span class="admin-badge">Admin</span>
+      </a>
+      <a class="nav-item admin-only" data-page="pairing" style="display:none">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+        Pairing
+        <span class="admin-badge">Admin</span>
+      </a>
+      <a class="nav-item admin-only" data-page="console" style="display:none">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+        MCP Console
+        <span class="admin-badge">Admin</span>
+      </a>
+      <a class="nav-item admin-only" data-page="guide" style="display:none">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        Setup Guide
+        <span class="admin-badge">Admin</span>
+      </a>
+    </nav>
+    <div class="sidebar-footer" id="sidebar-footer">
+      <span id="device-count">0</span> device(s) registered
+    </div>
+  </aside>
 
-  <section class="card" id="sample-flow">
-    <h2 style="margin: 0 0 0.5rem; font-size: 1rem;">Sample Flow: Zeroclaw ↔ Device</h2>
-    <p style="margin: 0 0 0.75rem; font-size: 0.875rem; color: #a1a1aa;">Follow these steps to test Zeroclaw interacting with a device via the hub.</p>
-    <div class="flow-steps">
-      <div class="flow-step" data-step="1">
-        <span class="step-num">1</span>
-        <div>
-          <strong>Start Zeroclaw with MCP hub</strong>
-          <p class="step-desc">Run <code>zeroclaw serve</code> (or <code>gateway</code>) with hub URL in config, then run <code>zeroclaw register</code> in another terminal to create a pairing code.</p>
-          <button type="button" class="step-action" data-action="refresh-pairings">Refresh pairings</button>
+  <!-- ════════════ MAIN CONTENT ════════════ -->
+  <div class="main">
+
+    <!-- ──── PAGE: Gateway (default, non-tech) ──── -->
+    <div class="page active" id="page-gateway">
+      <div class="page-title">Gateway</div>
+      <div class="page-subtitle">Connect to a device and use its tools</div>
+
+      <div id="gw-devices"></div>
+
+      <div class="card" id="gw-tools-card" style="display:none;">
+        <div class="card-title" style="display:flex;align-items:center;gap:0.5rem;">
+          <span id="gw-target-name" style="color:#60a5fa;"></span>
+          <span style="font-size:0.6875rem;color:#52525b;font-weight:400;" id="gw-target-id-label"></span>
+          <button class="btn btn-ghost btn-sm" style="margin-left:auto;" id="gw-change-device">Change</button>
         </div>
+        <label>Choose a tool</label>
+        <div class="tool-grid" id="gw-tool-grid"></div>
       </div>
-      <div class="flow-step" data-step="2">
-        <span class="step-num">2</span>
-        <div>
-          <strong>Confirm pairing</strong>
-          <p class="step-desc">Copy the pairing code from section 1 below. In the Zeroclaw terminal running <code>register</code>, paste the code when prompted. Or call <code>POST /api/v1/devices/register/confirm</code> with the pairing code.</p>
+
+      <div class="card" id="gw-form-card" style="display:none;">
+        <div style="display:flex;align-items:center;gap:0.5rem;margin-bottom:0.75rem;">
+          <div class="card-title" style="margin:0;" id="gw-form-tool-name"></div>
+          <button class="btn btn-ghost btn-sm" id="gw-back-tools">Back to tools</button>
         </div>
-      </div>
-      <div class="flow-step" data-step="3">
-        <span class="step-num">3</span>
-        <div>
-          <strong>Device appears in Connected Devices</strong>
-          <p class="step-desc">After pairing, the device shows in section 2. Click <strong>Call</strong> next to the device to load it into the MCP request form and fetch its tools.</p>
-          <button type="button" class="step-action" data-action="refresh-devices">Refresh devices</button>
+        <div style="font-size:0.8125rem;color:#71717a;margin-bottom:1rem;" id="gw-form-tool-desc"></div>
+        <div class="tool-form" id="gw-form-fields"></div>
+        <div class="gap-row">
+          <button class="btn btn-primary" id="gw-run">Run</button>
         </div>
-      </div>
-      <div class="flow-step" data-step="4">
-        <span class="step-num">4</span>
-        <div>
-          <strong>Initialize MCP session</strong>
-          <p class="step-desc">With device ID set, send <code>initialize</code> to handshake. Then send <code>tools/list</code> to see available tools.</p>
-          <button type="button" class="step-action" data-action="send-initialize">Send initialize</button>
-          <button type="button" class="step-action" data-action="send-tools-list">Send tools/list</button>
-        </div>
-      </div>
-      <div class="flow-step" data-step="5">
-        <span class="step-num">5</span>
-        <div>
-          <strong>Call a tool</strong>
-          <p class="step-desc">Select a tool (e.g. <code>file_read</code>, <code>memory_recall</code>), set method to <code>tools/call</code>, adjust arguments if needed, then click <strong>Send</strong>.</p>
-          <button type="button" class="step-action" data-action="send-file-read">Call file_read (README.md)</button>
-          <button type="button" class="step-action" data-action="send-memory-recall">Call memory_recall</button>
+        <div class="mt-2" id="gw-result-wrap" style="display:none;">
+          <div class="gap-row mb-1">
+            <span class="task-status idle" id="gw-status-badge">Idle</span>
+            <button class="btn btn-ghost btn-sm" id="gw-check-status" style="display:none;">Check Status</button>
+            <span style="font-size:0.6875rem;color:#52525b;" id="gw-status-time"></span>
+          </div>
+          <div class="task-output" id="gw-output"></div>
         </div>
       </div>
     </div>
-  </section>
 
-  <section class="card">
-    <h2 style="margin: 0 0 0.5rem; font-size: 1rem;">1. Pending Pairing Codes</h2>
-    <p style="margin: 0 0 0.5rem; font-size: 0.875rem; color: #a1a1aa;">When zeroclaw register runs, pairing codes appear here and in the hub terminal.</p>
-    <button id="btn-refresh-pairings">Refresh</button>
-    <div id="pairings-list" style="margin-top: 0.5rem; font-size: 1.25rem; font-weight: 600; letter-spacing: 0.2em;"></div>
-  </section>
-
-  <section class="card">
-    <h2 style="margin: 0 0 0.5rem; font-size: 1rem;">2. Connected Devices</h2>
-    <p style="margin: 0 0 0.5rem; font-size: 0.875rem; color: #a1a1aa;">Call fills device ID in section 3. Revoke disconnects and removes credential; device must re-register.</p>
-    <button id="btn-refresh-devices">Refresh</button>
-    <div id="devices-list"></div>
-  </section>
-
-  <section class="card">
-    <h2 style="margin: 0 0 0.5rem; font-size: 1rem;">3. Send MCP Request (as DatumBridge)</h2>
-    <p style="margin: 0 0 0.5rem; font-size: 0.875rem; color: #a1a1aa;">Sends JSON-RPC to device via hub proxy. Tools are auto-loaded when device ID is set.</p>
-    <label>Device ID</label>
-    <input type="text" id="target-device" placeholder="device to call (or click Call in section 2)">
-    <label style="margin-top: 0.5rem;">Tool to call (for tools/call)</label>
-    <select id="tool-select">
-      <option value="">— Select device first —</option>
-    </select>
-    <div id="tool-description" style="margin-top:0.25rem;font-size:0.75rem;color:#a1a1aa;display:none;"></div>
-    <label style="margin-top: 0.5rem;">MCP Method</label>
-    <select id="mcp-method">
-      <option value="initialize">initialize</option>
-      <option value="tools/list">tools/list</option>
-      <option value="tools/call">tools/call</option>
-    </select>
-    <label style="margin-top: 0.5rem;">Request body (JSON)</label>
-    <p style="margin: 0 0 0.25rem; font-size: 0.75rem; color: #71717a;">For file tools: use <b>relative paths</b> (e.g. README.md). Absolute paths are blocked unless in [autonomy].allowed_roots.</p>
-    <textarea id="mcp-body">{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test-ui","version":"1.0"}}}</textarea>
-    <div style="margin-top: 0.5rem;">
-      <button id="btn-send" class="primary">Send</button>
+    <!-- ──── PAGE: Devices (admin) ──── -->
+    <div class="page" id="page-devices">
+      <div class="page-title">Devices</div>
+      <div class="page-subtitle">Registered and connected devices with full metadata</div>
+      <div class="gap-row mb-1">
+        <button class="btn btn-ghost btn-sm" id="adm-refresh-devices">Refresh</button>
+      </div>
+      <div id="adm-devices-list"></div>
     </div>
-    <label style="margin-top: 1rem;">Response</label>
-    <pre id="mcp-response" class="log" style="min-height: 80px; font-family: ui-monospace, monospace; font-size: 0.75rem; white-space: pre-wrap; word-break: break-all;"></pre>
-  </section>
+
+    <!-- ──── PAGE: Pairing (admin) ──── -->
+    <div class="page" id="page-pairing">
+      <div class="page-title">Pairing</div>
+      <div class="page-subtitle">Pending pairing codes for device registration</div>
+      <div class="gap-row mb-1">
+        <button class="btn btn-ghost btn-sm" id="adm-refresh-pairings">Refresh</button>
+      </div>
+      <div id="adm-pairings-list" class="card" style="min-height:80px;"></div>
+    </div>
+
+    <!-- ──── PAGE: MCP Console (admin) ──── -->
+    <div class="page" id="page-console">
+      <div class="page-title">MCP Console</div>
+      <div class="page-subtitle">Send raw JSON-RPC requests to devices via the hub proxy</div>
+      <div class="card">
+        <label>Device ID</label>
+        <input type="text" id="con-device" placeholder="device ID (or select from Devices page)">
+        <label class="mt-1">Tool</label>
+        <select id="con-tool-select"><option value="">-- Select device first --</option></select>
+        <div id="con-tool-info" style="display:none;"></div>
+        <label class="mt-1">MCP Method</label>
+        <select id="con-method">
+          <option value="initialize">initialize</option>
+          <option value="tools/list">tools/list</option>
+          <option value="tools/call">tools/call</option>
+        </select>
+        <label class="mt-1">Request body (JSON)</label>
+        <textarea id="con-body" style="min-height:140px;">{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test-ui","version":"1.0"}}}</textarea>
+        <div class="mt-1"><button class="btn btn-primary" id="con-send">Send</button></div>
+        <label class="mt-2">Response</label>
+        <div class="console-response" id="con-response"></div>
+      </div>
+    </div>
+
+    <!-- ──── PAGE: Setup Guide (admin) ──── -->
+    <div class="page" id="page-guide">
+      <div class="page-title">Setup Guide</div>
+      <div class="page-subtitle">Step-by-step flow to pair and test a device</div>
+      <div class="card">
+        <div class="flow-steps">
+          <div class="flow-step"><span class="step-num">1</span><div><strong>Start ZeroClaw</strong><p class="step-desc">Run <code>zeroclaw gateway</code> with the hub URL in config, then run <code>zeroclaw register</code> in another terminal to create a pairing code.</p></div></div>
+          <div class="flow-step"><span class="step-num">2</span><div><strong>Confirm pairing</strong><p class="step-desc">Go to the <strong>Pairing</strong> page to see pending codes. In the ZeroClaw terminal running <code>register</code>, enter the code when prompted.</p></div></div>
+          <div class="flow-step"><span class="step-num">3</span><div><strong>Device connects</strong><p class="step-desc">After pairing, the device appears on the <strong>Gateway</strong> page. Click <strong>Use</strong> to see all tools available on that device.</p></div></div>
+          <div class="flow-step"><span class="step-num">4</span><div><strong>Use any tool</strong><p class="step-desc">Pick a tool from the grid. A dynamic form appears with all parameters. Fill in what you need, click <strong>Run</strong>, and see the result. For <code>cursor_cli</code> agent tasks, status is polled automatically.</p></div></div>
+          <div class="flow-step"><span class="step-num">5</span><div><strong>Advanced: MCP Console</strong><p class="step-desc">Use the <strong>MCP Console</strong> to send raw JSON-RPC requests: <code>initialize</code>, <code>tools/list</code>, <code>tools/call</code>.</p></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <script>
     const base = window.location.origin;
-
+    const isAdmin = new URLSearchParams(window.location.search).get('admin') === 'true';
     let cachedTools = [];
+    let allDevices = [];
+    let gwTargetDeviceId = null;
+    let statusPollTimer = null;
 
-    function sampleValue(name, prop) {
-      const t = prop.type;
-      const desc = (prop.description || '').toLowerCase();
-      const n = name.toLowerCase();
-      if (t === 'boolean') return true;
-      if (t === 'integer' || t === 'number') {
-        if (n.includes('limit') || n.includes('count') || n.includes('max')) return 10;
-        if (n.includes('offset') || n.includes('start')) return 0;
-        if (n.includes('timeout')) return 30;
-        return 1;
-      }
-      if (t === 'array') return prop.items ? [sampleValue('item', prop.items)] : [];
-      if (t === 'object') return {};
-      if (n === 'path' || n === 'file' || n === 'filepath' || n === 'file_path') return 'README.md';
-      if (n === 'command' || n === 'cmd') return 'echo hello';
-      if (n.includes('url')) return 'https://example.com';
-      if (n === 'query' || n === 'search' || n.includes('search')) return 'search term';
-      if (n === 'content' || n === 'text' || n === 'body') return 'Hello, world!';
-      if (n === 'key' || n === 'name') return 'example';
-      if (n === 'old_string') return 'old text';
-      if (n === 'new_string') return 'new text';
-      if (n === 'action') return prop.enum ? prop.enum[0] : 'run';
-      if (prop.enum && prop.enum.length) return prop.enum[0];
-      if (prop.default !== undefined) return prop.default;
-      const hint = prop.description || name;
-      return '<' + hint.slice(0, 60) + '>';
+    // ── Admin visibility ──
+    if (isAdmin) {
+      document.querySelectorAll('.admin-only').forEach(el => el.style.display = '');
     }
 
-    function argsForTool(toolName) {
-      const tool = cachedTools.find(t => t.name === toolName);
-      if (!tool || !tool.inputSchema || !tool.inputSchema.properties) return {};
-      const props = tool.inputSchema.properties;
-      const required = tool.inputSchema.required || [];
-      const args = {};
-      for (const [k, v] of Object.entries(props)) {
-        args[k] = sampleValue(k, v);
+    // ── Page navigation ──
+    document.querySelectorAll('.nav-item[data-page]').forEach(item => {
+      item.addEventListener('click', () => {
+        document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+        item.classList.add('active');
+        document.getElementById('page-' + item.dataset.page).classList.add('active');
+      });
+    });
+
+    // ══════════════════════════════════
+    // ── SHARED: Fetch devices
+    // ══════════════════════════════════
+    async function loadDevices() {
+      try {
+        const r = await fetch(base + '/api/v1/devices');
+        const j = await r.json();
+        allDevices = j.devices || [];
+      } catch (_) { allDevices = []; }
+      document.getElementById('device-count').textContent = allDevices.length;
+      renderGatewayDevices();
+      if (isAdmin) renderAdminDevices();
+    }
+
+    // ══════════════════════════════════
+    // ── GATEWAY PAGE
+    // ══════════════════════════════════
+    let gwTools = [];
+    let gwSelectedTool = null;
+
+    function renderGatewayDevices() {
+      const el = document.getElementById('gw-devices');
+      if (allDevices.length === 0) {
+        el.innerHTML = '<div class="empty-state">No devices registered yet.<br>Run <code>zeroclaw register</code> to pair a device.</div>';
+        return;
       }
+      el.innerHTML = '';
+      allDevices.forEach(d => {
+        const id = d.device_id || d;
+        const name = d.device_name || id;
+        const connected = d.connected || false;
+        const ip = d.device_ip || '';
+        const div = document.createElement('div');
+        div.className = 'device-card';
+        div.innerHTML = `
+          <span class="device-dot ${connected ? 'online' : 'offline'}"></span>
+          <div class="device-info">
+            <div class="device-name">${name}</div>
+            <div class="device-meta">${connected ? 'Online' : 'Offline'}${ip ? ' · ' + ip : ''}</div>
+          </div>
+          <div class="device-actions">
+            <button class="btn btn-primary btn-sm" ${connected ? '' : 'disabled style="opacity:0.4"'}>Use</button>
+          </div>`;
+        if (connected) {
+          div.querySelector('.btn-primary').onclick = () => selectGatewayDevice(id, name);
+        }
+        el.appendChild(div);
+      });
+    }
+
+    async function selectGatewayDevice(id, name) {
+      gwTargetDeviceId = id;
+      gwSelectedTool = null;
+      document.getElementById('gw-tools-card').style.display = '';
+      document.getElementById('gw-form-card').style.display = 'none';
+      document.getElementById('gw-target-name').textContent = name;
+      document.getElementById('gw-target-id-label').textContent = id;
+
+      // Auto-init + fetch tools
+      await fetch(`${base}/api/v1/devices/${encodeURIComponent(id)}/mcp`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jsonrpc: '2.0', id: 0, method: 'initialize', params: { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'gateway-ui', version: '1.0' } } })
+      }).catch(() => {});
+
+      try {
+        const r = await fetch(`${base}/api/v1/devices/${encodeURIComponent(id)}/mcp`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list', params: {} })
+        });
+        const j = await r.json();
+        gwTools = j.result?.tools || [];
+        cachedTools = gwTools;
+      } catch (_) { gwTools = []; }
+
+      renderToolGrid();
+    }
+
+    function renderToolGrid() {
+      const grid = document.getElementById('gw-tool-grid');
+      if (gwTools.length === 0) {
+        grid.innerHTML = '<div class="empty-state">No tools available on this device.</div>';
+        return;
+      }
+      grid.innerHTML = '';
+      gwTools.forEach(t => {
+        const tile = document.createElement('div');
+        tile.className = 'tool-tile';
+        tile.innerHTML = `<div class="tool-tile-name">${t.name}</div><div class="tool-tile-desc">${t.description || ''}</div>`;
+        tile.onclick = () => openToolForm(t);
+        grid.appendChild(tile);
+      });
+    }
+
+    function openToolForm(tool) {
+      gwSelectedTool = tool;
+      document.getElementById('gw-tools-card').style.display = 'none';
+      document.getElementById('gw-form-card').style.display = '';
+      document.getElementById('gw-form-tool-name').textContent = tool.name;
+      document.getElementById('gw-form-tool-desc').textContent = tool.description || '';
+      document.getElementById('gw-result-wrap').style.display = 'none';
+      document.getElementById('gw-check-status').style.display = 'none';
+      if (statusPollTimer) clearInterval(statusPollTimer);
+      renderToolForm(tool);
+    }
+
+    function renderToolForm(tool) {
+      const container = document.getElementById('gw-form-fields');
+      container.innerHTML = '';
+      const props = tool.inputSchema?.properties || {};
+      const required = tool.inputSchema?.required || [];
+      const keys = Object.keys(props);
+      if (keys.length === 0) {
+        container.innerHTML = '<div style="color:#52525b;font-size:0.8125rem;">This tool takes no parameters.</div>';
+        return;
+      }
+      keys.forEach(k => {
+        const p = props[k];
+        const isReq = required.includes(k);
+        const div = document.createElement('div');
+        div.className = 'field';
+        let label = `<div class="field-label">${friendlyLabel(k)}${isReq ? '<span class="field-required">required</span>' : ''}</div>`;
+        if (p.description) label += `<div class="field-hint">${p.description}</div>`;
+        div.innerHTML = label;
+        div.appendChild(createFieldInput(k, p));
+        container.appendChild(div);
+      });
+    }
+
+    function friendlyLabel(key) {
+      return key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    }
+
+    function createFieldInput(key, prop) {
+      if (prop.enum && prop.enum.length) {
+        const sel = document.createElement('select');
+        sel.dataset.field = key;
+        sel.innerHTML = `<option value="">-- select --</option>` + prop.enum.map(v => `<option value="${v}">${v}</option>`).join('');
+        if (prop.enum.length === 1) sel.value = prop.enum[0];
+        return sel;
+      }
+      if (prop.type === 'boolean') {
+        const wrap = document.createElement('div');
+        wrap.style.cssText = 'display:flex;gap:0.5rem;align-items:center;';
+        const cb = document.createElement('input');
+        cb.type = 'checkbox';
+        cb.dataset.field = key;
+        cb.dataset.fieldType = 'boolean';
+        cb.style.cssText = 'width:auto;';
+        const lbl = document.createElement('span');
+        lbl.textContent = 'Yes';
+        lbl.style.cssText = 'font-size:0.8125rem;color:#a1a1aa;';
+        wrap.appendChild(cb);
+        wrap.appendChild(lbl);
+        return wrap;
+      }
+      if (prop.type === 'integer' || prop.type === 'number') {
+        const inp = document.createElement('input');
+        inp.type = 'number';
+        inp.dataset.field = key;
+        inp.dataset.fieldType = prop.type;
+        inp.placeholder = prop.description || key;
+        return inp;
+      }
+      // string or fallback — use textarea for likely long text fields
+      const isLong = ['message', 'content', 'text', 'body', 'prompt', 'query', 'command'].includes(key.toLowerCase()) || (prop.description || '').length > 80;
+      if (isLong) {
+        const ta = document.createElement('textarea');
+        ta.dataset.field = key;
+        ta.placeholder = prop.description || key;
+        ta.style.minHeight = '60px';
+        ta.style.fontFamily = 'system-ui, sans-serif';
+        return ta;
+      }
+      const inp = document.createElement('input');
+      inp.type = 'text';
+      inp.dataset.field = key;
+      inp.placeholder = prop.description || key;
+      return inp;
+    }
+
+    function collectFormArgs() {
+      const args = {};
+      document.querySelectorAll('#gw-form-fields [data-field]').forEach(el => {
+        const key = el.dataset.field;
+        if (el.dataset.fieldType === 'boolean') {
+          args[key] = el.checked;
+        } else if (el.dataset.fieldType === 'integer') {
+          if (el.value !== '') args[key] = parseInt(el.value, 10);
+        } else if (el.dataset.fieldType === 'number') {
+          if (el.value !== '') args[key] = parseFloat(el.value);
+        } else {
+          if (el.value !== '') args[key] = el.value;
+        }
+      });
       return args;
     }
 
-    function updateToolDescription() {
-      const el = document.getElementById('tool-description');
-      const toolName = document.getElementById('tool-select').value;
-      const tool = cachedTools.find(t => t.name === toolName);
-      if (!tool) { el.style.display = 'none'; return; }
-      const props = tool.inputSchema?.properties || {};
-      const required = tool.inputSchema?.required || [];
-      let html = '<div style="margin-top:0.25rem;padding:0.5rem;background:#1e1e22;border-radius:6px;border:1px solid #27272a;">';
-      html += '<div style="color:#e4e4e7;font-weight:600;margin-bottom:0.25rem;">' + tool.name + '</div>';
-      if (tool.description) html += '<div style="margin-bottom:0.5rem;">' + tool.description + '</div>';
-      const keys = Object.keys(props);
-      if (keys.length) {
-        html += '<div style="margin-top:0.25rem;border-top:1px solid #27272a;padding-top:0.25rem;">';
-        keys.forEach(k => {
-          const p = props[k];
-          const req = required.includes(k);
-          const typeStr = p.type || 'any';
-          const enumStr = p.enum ? ' [' + p.enum.join(', ') + ']' : '';
-          html += '<div style="margin:0.125rem 0;"><code style="color:#60a5fa;">' + k + '</code>';
-          html += ' <span style="color:#71717a;">' + typeStr + enumStr + '</span>';
-          if (req) html += ' <span style="color:#f87171;font-size:0.625rem;">required</span>';
-          if (p.description) html += ' — ' + p.description;
-          html += '</div>';
-        });
-        html += '</div>';
-      }
-      html += '</div>';
-      el.innerHTML = html;
-      el.style.display = 'block';
-    }
+    document.getElementById('gw-back-tools').onclick = () => {
+      document.getElementById('gw-form-card').style.display = 'none';
+      document.getElementById('gw-tools-card').style.display = '';
+      if (statusPollTimer) clearInterval(statusPollTimer);
+    };
 
-    async function fetchToolsList(deviceId) {
-      if (!deviceId) return;
-      const respEl = document.getElementById('mcp-response');
-      const selectEl = document.getElementById('tool-select');
+    document.getElementById('gw-change-device').onclick = () => {
+      document.getElementById('gw-tools-card').style.display = 'none';
+      document.getElementById('gw-form-card').style.display = 'none';
+      gwTargetDeviceId = null;
+      if (statusPollTimer) clearInterval(statusPollTimer);
+    };
+
+    document.getElementById('gw-run').onclick = async () => {
+      if (!gwTargetDeviceId || !gwSelectedTool) return;
+      const args = collectFormArgs();
+      const outEl = document.getElementById('gw-output');
+      const badge = document.getElementById('gw-status-badge');
+      const wrap = document.getElementById('gw-result-wrap');
+      const checkBtn = document.getElementById('gw-check-status');
+      const timeEl = document.getElementById('gw-status-time');
+
+      wrap.style.display = '';
+      badge.className = 'task-status running';
+      badge.textContent = 'Running...';
+      outEl.textContent = 'Sending request...';
+      checkBtn.style.display = 'none';
+      timeEl.textContent = '';
+      if (statusPollTimer) clearInterval(statusPollTimer);
+
       try {
-        const req = { jsonrpc: '2.0', id: 99, method: 'tools/list', params: {} };
-        const r = await fetch(`${base}/api/v1/devices/${encodeURIComponent(deviceId)}/mcp`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(req)
+        const r = await fetch(`${base}/api/v1/devices/${encodeURIComponent(gwTargetDeviceId)}/mcp`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ jsonrpc: '2.0', id: Date.now(), method: 'tools/call', params: { name: gwSelectedTool.name, arguments: args } })
         });
-        const text = await r.text();
-        respEl.textContent = r.ok ? text : `HTTP ${r.status}\n${text}`;
-        if (!r.ok) return;
-        const j = JSON.parse(text);
-        const tools = j.result?.tools || [];
-        cachedTools = tools;
-        selectEl.innerHTML = '<option value="">— Select tool —</option>' +
-          tools.map(t => `<option value="${t.name}">${t.name} — ${(t.description || '').slice(0, 50)}…</option>`).join('');
+        const j = await r.json();
+        if (j.error) {
+          badge.className = 'task-status failed';
+          badge.textContent = 'Error';
+          outEl.textContent = j.error.message || JSON.stringify(j.error, null, 2);
+          return;
+        }
+        const content = j.result?.content?.[0]?.text || JSON.stringify(j.result, null, 2);
+        const isError = j.result?.is_error;
+
+        // Special handling for cursor_cli agent: auto-poll status
+        let parsed = null;
+        try { parsed = JSON.parse(content); } catch (_) {}
+        if (parsed?.status === 'started' && parsed?.hint) {
+          badge.className = 'task-status running';
+          badge.textContent = 'Running';
+          outEl.textContent = 'Agent started in a terminal window.\nPolling for output...';
+          timeEl.textContent = 'Started just now';
+          checkBtn.style.display = '';
+          startStatusPolling(parsed.workspace || args.workspace);
+          return;
+        }
+
+        badge.className = isError ? 'task-status failed' : 'task-status completed';
+        badge.textContent = isError ? 'Failed' : 'Done';
+        // Format output nicely
+        if (parsed) {
+          outEl.textContent = JSON.stringify(parsed, null, 2);
+        } else {
+          outEl.textContent = content;
+        }
       } catch (e) {
-        respEl.textContent = 'Error: ' + e.message;
+        badge.className = 'task-status failed';
+        badge.textContent = 'Error';
+        outEl.textContent = 'Connection error: ' + e.message;
       }
+    };
+
+    function startStatusPolling(workspace) {
+      if (statusPollTimer) clearInterval(statusPollTimer);
+      statusPollTimer = setInterval(() => pollAgentStatus(workspace), 3000);
+      setTimeout(() => pollAgentStatus(workspace), 2000);
     }
 
-    async function refreshDevices() {
-      const r = await fetch(base + '/api/v1/devices');
-      const j = await r.json();
-      const list = document.getElementById('devices-list');
-      list.innerHTML = '';
-      const devices = j.devices || [];
-      if (devices.length === 0) {
-        list.innerHTML = '<p style="color:#71717a;font-size:0.875rem;">No devices registered yet.</p>';
+    async function pollAgentStatus(workspace) {
+      if (!gwTargetDeviceId) return;
+      const args = { operation: 'agent_status', tail: 80 };
+      if (workspace) args.workspace = workspace;
+      try {
+        const r = await fetch(`${base}/api/v1/devices/${encodeURIComponent(gwTargetDeviceId)}/mcp`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ jsonrpc: '2.0', id: Date.now(), method: 'tools/call', params: { name: 'cursor_cli', arguments: args } })
+        });
+        const j = await r.json();
+        const content = j.result?.content?.[0]?.text;
+        if (!content) return;
+        let parsed;
+        try { parsed = JSON.parse(content); } catch (_) { return; }
+        const badge = document.getElementById('gw-status-badge');
+        const outEl = document.getElementById('gw-output');
+        const timeEl = document.getElementById('gw-status-time');
+        const st = parsed.status || 'unknown';
+        if (st === 'running') { badge.className = 'task-status running'; badge.textContent = 'Running'; }
+        else if (st === 'completed') { badge.className = 'task-status completed'; badge.textContent = 'Completed'; clearInterval(statusPollTimer); }
+        else if (st === 'failed' || st === 'dead') { badge.className = 'task-status failed'; badge.textContent = st === 'dead' ? 'Crashed' : 'Failed'; clearInterval(statusPollTimer); }
+        else if (st === 'not_found') { badge.className = 'task-status idle'; badge.textContent = 'Not Started'; return; }
+        if (parsed.started_at) {
+          const elapsed = Math.round((Date.now() - new Date(parsed.started_at).getTime()) / 1000);
+          timeEl.textContent = elapsed < 60 ? `${elapsed}s` : `${Math.floor(elapsed / 60)}m ${elapsed % 60}s`;
+          if (parsed.finished_at) timeEl.textContent += ' (finished)';
+        }
+        if (parsed.output_tail) { outEl.textContent = parsed.output_tail; outEl.scrollTop = outEl.scrollHeight; }
+      } catch (_) {}
+    }
+
+    document.getElementById('gw-check-status').onclick = () => {
+      const ws = document.querySelector('#gw-form-fields [data-field="workspace"]');
+      pollAgentStatus(ws?.value || undefined);
+    };
+
+    // ══════════════════════════════════
+    // ── ADMIN: Devices page
+    // ══════════════════════════════════
+    function renderAdminDevices() {
+      const el = document.getElementById('adm-devices-list');
+      if (allDevices.length === 0) {
+        el.innerHTML = '<div class="empty-state">No devices registered.</div>';
         return;
       }
-      devices.forEach(d => {
-        const id = typeof d === 'string' ? d : d.device_id;
+      el.innerHTML = '';
+      allDevices.forEach(d => {
+        const id = d.device_id || d;
         const name = d.device_name || '';
         const ip = d.device_ip || '';
         const mac = d.device_mac || '';
         const connected = d.connected || false;
         const connIP = d.connected_ip || '';
         const connAt = d.connected_at || '';
-
-        const row = document.createElement('div');
-        row.style.cssText = 'display:flex;align-items:center;gap:0.75rem;padding:0.5rem 0.5rem;border-bottom:1px solid #27272a;font-size:0.875rem;';
-
-        const status = document.createElement('span');
-        status.style.cssText = `width:8px;height:8px;border-radius:50%;flex-shrink:0;background:${connected ? '#22c55e' : '#71717a'};`;
-        status.title = connected ? 'Connected' : 'Offline';
-
-        const info = document.createElement('div');
-        info.style.cssText = 'flex:1;min-width:0;';
-        const line1 = document.createElement('div');
-        line1.style.cssText = 'font-weight:600;display:flex;align-items:center;gap:0.5rem;';
-        line1.innerHTML = `<span>${name || id}</span>`;
-        if (name) {
-          const idTag = document.createElement('span');
-          idTag.style.cssText = 'font-size:0.75rem;color:#71717a;font-weight:400;';
-          idTag.textContent = id;
-          line1.appendChild(idTag);
-        }
-        info.appendChild(line1);
-        const line2 = document.createElement('div');
-        line2.style.cssText = 'font-size:0.75rem;color:#a1a1aa;margin-top:0.125rem;';
-        const parts = [];
-        if (ip) parts.push('IP: ' + ip);
-        if (mac) parts.push('MAC: ' + mac);
-        if (connected && connIP) parts.push('Connected from: ' + connIP);
-        if (connected && connAt) parts.push('Since: ' + new Date(connAt).toLocaleString());
-        line2.textContent = parts.join(' · ');
-        if (parts.length) info.appendChild(line2);
-
-        const actions = document.createElement('div');
-        actions.style.cssText = 'display:flex;gap:0.25rem;flex-shrink:0;';
-        const callBtn = document.createElement('button');
-        callBtn.textContent = 'Call';
-        callBtn.className = 'primary';
-        callBtn.style.cssText = 'font-size:0.75rem;padding:0.25rem 0.5rem;';
-        callBtn.disabled = !connected;
-        if (!connected) callBtn.style.opacity = '0.4';
-        callBtn.onclick = () => {
-          document.getElementById('target-device').value = id;
-          fetchToolsList(id);
+        const regAt = d.registered_at || '';
+        const div = document.createElement('div');
+        div.className = 'device-card';
+        const meta = [ip ? 'IP: ' + ip : '', mac ? 'MAC: ' + mac : '', regAt ? 'Registered: ' + new Date(regAt).toLocaleString() : '', connected && connIP ? 'Connected from: ' + connIP : '', connected && connAt ? 'Since: ' + new Date(connAt).toLocaleString() : ''].filter(Boolean).join(' · ');
+        div.innerHTML = `
+          <span class="device-dot ${connected ? 'online' : 'offline'}"></span>
+          <div class="device-info">
+            <div class="device-name">${name || id} ${name ? '<span style="color:#52525b;font-weight:400;font-size:0.75rem;">' + id + '</span>' : ''}</div>
+            <div class="device-meta">${meta}</div>
+          </div>
+          <div class="device-actions">
+            <button class="btn btn-ghost btn-sm con-call-btn">Console</button>
+            <button class="btn btn-danger btn-sm revoke-btn">Revoke</button>
+          </div>`;
+        div.querySelector('.con-call-btn').onclick = () => {
+          document.getElementById('con-device').value = id;
+          fetchConTools(id);
+          document.querySelector('[data-page="console"]').click();
         };
-        const revokeBtn = document.createElement('button');
-        revokeBtn.textContent = 'Revoke';
-        revokeBtn.className = 'danger';
-        revokeBtn.style.cssText = 'font-size:0.75rem;padding:0.25rem 0.5rem;';
-        revokeBtn.onclick = async () => {
-          if (!confirm(`Revoke device "${name || id}"? It will be disconnected and must re-register.`)) return;
-          try {
-            const dr = await fetch(`${base}/api/v1/devices/${encodeURIComponent(id)}`, { method: 'DELETE' });
-            if (dr.ok) refreshDevices();
-            else alert('Failed to revoke: ' + (await dr.text()));
-          } catch (e) {
-            alert('Error: ' + e.message);
-          }
+        div.querySelector('.revoke-btn').onclick = async () => {
+          if (!confirm(`Revoke "${name || id}"? The device must re-register.`)) return;
+          await fetch(`${base}/api/v1/devices/${encodeURIComponent(id)}`, { method: 'DELETE' });
+          loadDevices();
         };
-        actions.appendChild(callBtn);
-        actions.appendChild(revokeBtn);
-
-        row.appendChild(status);
-        row.appendChild(info);
-        row.appendChild(actions);
-        list.appendChild(row);
+        el.appendChild(div);
       });
     }
+    document.getElementById('adm-refresh-devices').onclick = loadDevices;
 
-    document.getElementById('btn-refresh-devices').onclick = refreshDevices;
-
-    document.getElementById('sample-flow').addEventListener('click', (e) => {
-      const btn = e.target.closest('.step-action');
-      if (!btn) return;
-      const deviceId = document.getElementById('target-device').value.trim();
-      const respEl = document.getElementById('mcp-response');
-      const action = btn.dataset.action;
-      if (action === 'refresh-pairings') {
-        refreshPairings();
-      } else if (action === 'refresh-devices') {
-        refreshDevices();
-      } else if (action === 'send-initialize' || action === 'send-tools-list' || action === 'send-file-read' || action === 'send-memory-recall') {
-        if (!deviceId) {
-          respEl.textContent = 'Set Device ID first (section 2: click Call next to a device).';
-          return;
-        }
-        let body;
-        if (action === 'send-initialize') {
-          body = '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test-ui","version":"1.0"}}}';
-          document.getElementById('mcp-method').value = 'initialize';
-        } else if (action === 'send-tools-list') {
-          body = '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}';
-          document.getElementById('mcp-method').value = 'tools/list';
-        } else if (action === 'send-file-read') {
-          const fileArgs = argsForTool('file_read');
-          body = JSON.stringify({
-            jsonrpc: '2.0',
-            id: 3,
-            method: 'tools/call',
-            params: { name: 'file_read', arguments: Object.keys(fileArgs).length ? fileArgs : { path: 'README.md' } }
-          }, null, 2);
-          document.getElementById('mcp-method').value = 'tools/call';
-          document.getElementById('tool-select').value = 'file_read';
+    // ══════════════════════════════════
+    // ── ADMIN: Pairing page
+    // ══════════════════════════════════
+    async function loadPairings() {
+      try {
+        const r = await fetch(base + '/api/v1/pairing/pending');
+        const j = await r.json();
+        const list = j.pairings || [];
+        const el = document.getElementById('adm-pairings-list');
+        if (list.length === 0) {
+          el.innerHTML = '<div class="empty-state">No pending pairings.<br>Run <code>zeroclaw register</code> to create one.</div>';
         } else {
-          const memArgs = argsForTool('memory_recall');
-          body = JSON.stringify({
-            jsonrpc: '2.0',
-            id: 3,
-            method: 'tools/call',
-            params: { name: 'memory_recall', arguments: Object.keys(memArgs).length ? memArgs : { query: 'test', limit: 5 } }
-          }, null, 2);
-          document.getElementById('mcp-method').value = 'tools/call';
-          document.getElementById('tool-select').value = 'memory_recall';
+          el.innerHTML = list.map(p => `<div class="pairing-code">${p.pairing_code}</div>`).join('');
         }
-        document.getElementById('mcp-body').value = body;
-        fetch(`${base}/api/v1/devices/${encodeURIComponent(deviceId)}/mcp`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body
-        }).then(r => r.text()).then(text => {
-          respEl.textContent = text;
-          if (action === 'send-tools-list' && text) {
-            try {
-              const j = JSON.parse(text);
-              const tools = j.result?.tools || [];
-              if (tools.length) {
-                const selectEl = document.getElementById('tool-select');
-                cachedTools = tools;
-                selectEl.innerHTML = '<option value="">— Select tool —</option>' +
-                  tools.map(t => `<option value="${t.name}">${t.name} — ${(t.description || '').slice(0, 50)}…</option>`).join('');
-              }
-            } catch (_) {}
-          }
-        }).catch(err => { respEl.textContent = 'Error: ' + err.message; });
-      }
-    });
-
-    async function refreshPairings() {
-      const r = await fetch(base + '/api/v1/pairing/pending');
-      const j = await r.json();
-      const list = document.getElementById('pairings-list');
-      const pairings = j.pairings || [];
-      if (pairings.length === 0) {
-        list.textContent = 'No pending pairings. Run zeroclaw register to create one.';
-      } else {
-        list.innerHTML = pairings.map(p => `<span style="display:block;margin:0.25rem 0;">${p.pairing_code}</span>`).join('');
-      }
+      } catch (_) {}
     }
-    document.getElementById('btn-refresh-pairings').onclick = refreshPairings;
-    setInterval(refreshPairings, 2000);
+    document.getElementById('adm-refresh-pairings').onclick = loadPairings;
+    setInterval(loadPairings, 3000);
 
-    document.getElementById('target-device').onchange = function() {
-      const id = this.value.trim();
-      if (id) fetchToolsList(id);
-    };
+    // ══════════════════════════════════
+    // ── ADMIN: MCP Console page
+    // ══════════════════════════════════
+    function sampleValue(name, prop) {
+      const t = prop.type, n = name.toLowerCase();
+      if (t === 'boolean') return true;
+      if (t === 'integer' || t === 'number') { return n.includes('limit') || n.includes('count') ? 10 : n.includes('offset') ? 0 : 1; }
+      if (t === 'array') return prop.items ? [sampleValue('item', prop.items)] : [];
+      if (t === 'object') return {};
+      if (n === 'path' || n === 'file') return 'README.md';
+      if (n === 'command' || n === 'cmd') return 'echo hello';
+      if (n.includes('url')) return 'https://example.com';
+      if (n === 'query' || n.includes('search')) return 'search term';
+      if (n === 'content' || n === 'text' || n === 'body') return 'Hello, world!';
+      if (n === 'old_string') return 'old text';
+      if (n === 'new_string') return 'new text';
+      if (prop.enum?.length) return prop.enum[0];
+      if (prop.default !== undefined) return prop.default;
+      return '<' + (prop.description || name).slice(0, 60) + '>';
+    }
+    function argsForTool(toolName) {
+      const tool = cachedTools.find(t => t.name === toolName);
+      if (!tool?.inputSchema?.properties) return {};
+      const args = {};
+      for (const [k, v] of Object.entries(tool.inputSchema.properties)) args[k] = sampleValue(k, v);
+      return args;
+    }
 
-    document.getElementById('btn-send').onclick = async () => {
-      const deviceId = document.getElementById('target-device').value.trim();
-      const body = document.getElementById('mcp-body').value;
-      const respEl = document.getElementById('mcp-response');
+    async function fetchConTools(deviceId) {
+      if (!deviceId) return;
       try {
         const r = await fetch(`${base}/api/v1/devices/${encodeURIComponent(deviceId)}/mcp`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ jsonrpc: '2.0', id: 99, method: 'tools/list', params: {} })
         });
         const text = await r.text();
-        respEl.textContent = r.ok ? text : `HTTP ${r.status}\n${text}`;
-      } catch (e) {
-        respEl.textContent = 'Error: ' + e.message;
+        document.getElementById('con-response').textContent = text;
+        const j = JSON.parse(text);
+        cachedTools = j.result?.tools || [];
+        const sel = document.getElementById('con-tool-select');
+        sel.innerHTML = '<option value="">-- Select tool --</option>' +
+          cachedTools.map(t => `<option value="${t.name}">${t.name} — ${(t.description || '').slice(0, 50)}</option>`).join('');
+      } catch (_) {}
+    }
+
+    document.getElementById('con-device').onchange = function () { fetchConTools(this.value.trim()); };
+
+    document.getElementById('con-tool-select').onchange = function () {
+      const toolName = this.value;
+      const method = document.getElementById('con-method').value;
+      // Update tool info panel
+      const infoEl = document.getElementById('con-tool-info');
+      const tool = cachedTools.find(t => t.name === toolName);
+      if (!tool) { infoEl.style.display = 'none'; return; }
+      const props = tool.inputSchema?.properties || {};
+      const req = tool.inputSchema?.required || [];
+      let html = '<div class="tool-info"><div class="tool-info-name">' + tool.name + '</div>';
+      if (tool.description) html += '<div style="margin-bottom:0.375rem;">' + tool.description + '</div>';
+      Object.entries(props).forEach(([k, v]) => {
+        html += `<div><code>${k}</code> <span style="color:#52525b;">${v.type || 'any'}${v.enum ? ' [' + v.enum.join(', ') + ']' : ''}</span>${req.includes(k) ? ' <span class="req">required</span>' : ''}${v.description ? ' — ' + v.description : ''}</div>`;
+      });
+      html += '</div>';
+      infoEl.innerHTML = html;
+      infoEl.style.display = '';
+      if (toolName && method === 'tools/call') {
+        document.getElementById('con-body').value = JSON.stringify({ jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: toolName, arguments: argsForTool(toolName) } }, null, 2);
       }
     };
 
-    document.getElementById('tool-select').onchange = () => {
-      const tool = document.getElementById('tool-select').value;
-      const method = document.getElementById('mcp-method').value;
-      if (tool && method === 'tools/call') {
-        const args = argsForTool(tool);
-        document.getElementById('mcp-body').value = JSON.stringify({
-          jsonrpc: '2.0',
-          id: 3,
-          method: 'tools/call',
-          params: { name: tool, arguments: args }
-        }, null, 2);
-      }
-      updateToolDescription();
+    document.getElementById('con-method').onchange = function () {
+      const m = this.value, body = document.getElementById('con-body'), tool = document.getElementById('con-tool-select').value;
+      if (m === 'initialize') body.value = '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test-ui","version":"1.0"}}}';
+      else if (m === 'tools/list') body.value = '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}';
+      else if (m === 'tools/call' && tool) body.value = JSON.stringify({ jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: tool, arguments: argsForTool(tool) } }, null, 2);
+      else if (m === 'tools/call') body.value = '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"tool_name","arguments":{}}}';
     };
 
-    document.getElementById('mcp-method').onchange = () => {
-      const m = document.getElementById('mcp-method').value;
-      const body = document.getElementById('mcp-body');
-      const tool = document.getElementById('tool-select').value;
-      if (m === 'initialize') {
-        body.value = '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"test-ui","version":"1.0"}}}';
-      } else if (m === 'tools/list') {
-        body.value = '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}';
-      } else if (m === 'tools/call' && tool) {
-        const args = argsForTool(tool);
-        body.value = JSON.stringify({
-          jsonrpc: '2.0',
-          id: 3,
-          method: 'tools/call',
-          params: { name: tool, arguments: args }
-        }, null, 2);
-      } else if (m === 'tools/call') {
-        body.value = '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"tool_name","arguments":{}}}';
-      }
+    document.getElementById('con-send').onclick = async () => {
+      const id = document.getElementById('con-device').value.trim();
+      const body = document.getElementById('con-body').value;
+      const el = document.getElementById('con-response');
+      if (!id) { el.textContent = 'Set Device ID first.'; return; }
+      try {
+        const r = await fetch(`${base}/api/v1/devices/${encodeURIComponent(id)}/mcp`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body
+        });
+        el.textContent = await r.text();
+      } catch (e) { el.textContent = 'Error: ' + e.message; }
     };
 
-    refreshDevices();
-    refreshPairings();
+    // ══════════════════════════════════
+    // ── INIT
+    // ══════════════════════════════════
+    loadDevices();
+    loadPairings();
+    setInterval(loadDevices, 5000);
   </script>
 </body>
 </html>
