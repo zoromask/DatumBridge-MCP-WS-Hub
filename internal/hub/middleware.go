@@ -71,7 +71,7 @@ func CORSMiddleware(next http.Handler) http.Handler {
 				}
 			}
 			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
-			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-API-Key, Authorization")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Accept, X-API-Key, Authorization, Mcp-Session-Id")
 			w.Header().Set("Access-Control-Max-Age", "86400")
 		}
 

@@ -21,6 +21,7 @@ POST /api/v1/devices/         ┌──────────────┐
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/health` | Health check |
+| POST | `/mcp` | **MCP Streamable HTTP** (for DatumBridge `datumbridge-mcp` publish/approve): `initialize` → `Mcp-Session-Id` header, then `tools/list`, `tools/call` |
 | POST | `/api/v1/devices/register` | Register a new device (returns device_id + token) |
 | POST | `/api/v1/devices/register/confirm` | Confirm 6-digit pairing code |
 | GET | `/api/v1/devices` | List connected devices |
@@ -87,6 +88,13 @@ The image does not bake hub settings with `ENV` (so nothing sensitive or operati
 
 - **Health check**: `curl http://localhost:8082/health`
 - **Test UI**: `http://localhost:8082/`
+
+## DatumBridge MCP publish / Request Approve
+
+The platform’s MCP service calls `POST {baseURL}/mcp` with JSON-RPC `initialize` and `tools/list` (same contract as `google-drive-mcp` via FastMCP HTTP). This hub implements that subset so tools can be registered after deploy.
+
+- Set **`server_port` to `8082`** (or your `HUB_PORT`) when publishing so `datumbridge-mcp` builds the correct Kubernetes endpoint.
+- Advertised tools: **`hub_info`** (hub + device summary) and **`forward_jsonrpc_to_device`** (same behavior as `POST /api/v1/devices/{device_id}/mcp`).
 
 ## Security
 

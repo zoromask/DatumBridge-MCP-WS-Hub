@@ -45,6 +45,7 @@ type Hub struct {
 	pendingMu    sync.Mutex
 	creds        *credentialStore
 	pairingStore *pairingStore
+	mcpSessions  *mcpSessionStore // Streamable HTTP /mcp (initialize + tools/list)
 }
 
 // credentialsFilePath returns the path for persisting device credentials.
@@ -69,6 +70,7 @@ func New() *Hub {
 		pending:      make(map[string]*pendingReq),
 		creds:        creds,
 		pairingStore: newPairingStore(),
+		mcpSessions:  newMCPSessionStore(),
 	}
 }
 
