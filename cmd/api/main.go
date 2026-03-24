@@ -48,6 +48,7 @@ func main() {
 	r := mux.NewRouter()
 	r.HandleFunc("/health", hub.HandleHealth).Methods("GET")
 	r.HandleFunc("/mcp", h.HandleMCPStreamableHTTP).Methods("POST", "OPTIONS")
+	r.HandleFunc("/mcp/", h.HandleMCPStreamableHTTP).Methods("POST", "OPTIONS")
 	r.HandleFunc("/ws", h.HandleWS)
 	r.HandleFunc("/api/v1/devices", h.HandleListDevices).Methods("GET")
 	r.HandleFunc("/api/v1/devices/register", h.HandleRegisterDevice).Methods("POST")
@@ -62,7 +63,7 @@ func main() {
 
 	port := os.Getenv("HUB_PORT")
 	if port == "" {
-		port = "8082"
+		port = "8000"
 	}
 	addr := ":" + port
 

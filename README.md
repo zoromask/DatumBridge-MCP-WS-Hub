@@ -36,7 +36,7 @@ POST /api/v1/devices/         ┌──────────────┐
 ### Direct Registration
 
 ```bash
-curl -X POST http://localhost:8082/api/v1/devices/register \
+curl -X POST http://localhost:8000/api/v1/devices/register \
   -H "Content-Type: application/json" \
   -H "X-API-Key: $HUB_REGISTER_API_KEY" \
   -d '{"device_id": "my-device"}'
@@ -58,7 +58,7 @@ Pairing codes expire after 5 minutes.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `HUB_PORT` | `8082` | HTTP/WS listen port |
+| `HUB_PORT` | `8000` | HTTP/WS listen port |
 | `HUB_CREDENTIALS_FILE` | `./data/devices.json` | Path to persist device credentials |
 | `HUB_REGISTER_API_KEY` | _(empty = open)_ | API key for `/register` endpoint (X-API-Key or Bearer) |
 | `HUB_ALLOWED_ORIGINS` | _(empty: WebSocket same-origin or no `Origin`; HTTP CORS still echoes caller `Origin`)_ | Comma-separated origins (exact match) for WebSocket; same list restricts CORS when set |
@@ -78,22 +78,22 @@ go run ./cmd/api
 
 ```bash
 docker build -t datumbridge-mcp-ws-hub .
-docker run -p 8082:8082 \
+docker run -p 8000:8000 \
   -e HUB_REGISTER_API_KEY=my-secret-key \
   -v hub-data:/data \
   datumbridge-mcp-ws-hub
 ```
 
-The image does not bake hub settings with `ENV` (so nothing sensitive or operational ends up in image metadata from `docker inspect`). Defaults: port `8082`, credentials file `data/devices.json` relative to `WORKDIR /` → `/data/devices.json` with the volume above. Override with `-e HUB_PORT`, `-e HUB_CREDENTIALS_FILE`, etc., as needed.
+The image does not bake hub settings with `ENV` (so nothing sensitive or operational ends up in image metadata from `docker inspect`). Defaults: port `8000`, credentials file `data/devices.json` relative to `WORKDIR /` → `/data/devices.json` with the volume above. Override with `-e HUB_PORT`, `-e HUB_CREDENTIALS_FILE`, etc., as needed.
 
-- **Health check**: `curl http://localhost:8082/health`
-- **Test UI**: `http://localhost:8082/`
+- **Health check**: `curl http://localhost:8000/health`
+- **Test UI**: `http://localhost:8000/`
 
 ## DatumBridge MCP publish / Request Approve
 
 The platform’s MCP service calls `POST {baseURL}/mcp` with JSON-RPC `initialize` and `tools/list` (same contract as `google-drive-mcp` via FastMCP HTTP). This hub implements that subset so tools can be registered after deploy.
 
-- Set **`server_port` to `8082`** (or your `HUB_PORT`) when publishing so `datumbridge-mcp` builds the correct Kubernetes endpoint.
+- Set **`server_port` to `8000`** (or your `HUB_PORT`) when publishing so `datumbridge-mcp` builds the correct Kubernetes endpoint.
 - Advertised tools: **`hub_info`** (hub + device summary) and **`forward_jsonrpc_to_device`** (same behavior as `POST /api/v1/devices/{device_id}/mcp`).
 
 ## Security

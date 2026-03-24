@@ -9,9 +9,9 @@ func TestValidateWebSocketOrigin_UnsetEnv_SameHost(t *testing.T) {
 	t.Setenv("HUB_ALLOWED_ORIGINS", "")
 	r := &http.Request{
 		Header: http.Header{},
-		Host:   "localhost:8082",
+		Host:   "localhost:8000",
 	}
-	r.Header.Set("Origin", "http://localhost:8082")
+	r.Header.Set("Origin", "http://localhost:8000")
 	if !ValidateWebSocketOrigin(r) {
 		t.Fatal("expected same-origin Origin to be allowed")
 	}
@@ -19,7 +19,7 @@ func TestValidateWebSocketOrigin_UnsetEnv_SameHost(t *testing.T) {
 
 func TestValidateWebSocketOrigin_UnsetEnv_NoOrigin(t *testing.T) {
 	t.Setenv("HUB_ALLOWED_ORIGINS", "")
-	r := &http.Request{Header: http.Header{}, Host: "localhost:8082"}
+	r := &http.Request{Header: http.Header{}, Host: "localhost:8000"}
 	if !ValidateWebSocketOrigin(r) {
 		t.Fatal("expected missing Origin to be allowed (native clients)")
 	}
