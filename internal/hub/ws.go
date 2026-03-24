@@ -2,6 +2,7 @@ package hub
 
 import (
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -16,6 +17,20 @@ const (
 	pingPeriod = (pongWait * 9) / 10 // 54s — must be less than pongWait
 )
 
+// checkSameOrigin validates Origin against Host to prevent CSRF.
+// Mirrors gorilla/websocket default: allow if Origin is empty or matches request Host.
+func checkSameOrigin(r *http.Request) bool {
+	origin := r.Header.Get("Origin")
+	if origin == "" {
+		return true // No Origin (e.g. native clients, curl) — allow
+	}
+	u, err := url.Parse(origin)
+	if err != nil {
+		return false
+	}
+	return u.Host == r.Host
+}
+
 func newUpgrader() websocket.Upgrader {
 	origins := parseAllowedOrigins()
 	return websocket.Upgrader{
@@ -23,7 +38,8 @@ func newUpgrader() websocket.Upgrader {
 		WriteBufferSize: 1024,
 		CheckOrigin: func(r *http.Request) bool {
 			if len(origins) == 0 {
-				return true // not configured — allow all (dev mode)
+				// Not configured: use same-origin check to prevent CSRF (per gorilla/websocket docs)
+				return checkSameOrigin(r)
 			}
 			origin := r.Header.Get("Origin")
 			for _, o := range origins {

@@ -34,21 +34,27 @@ func writeAPIError(w http.ResponseWriter, status int, code, message string, retr
 	})
 }
 
+// jsonrpcError is used for proper JSON encoding to prevent XSS (avoids direct w.Write).
+type jsonrpcError struct {
+	JSONRPC string `json:"jsonrpc"`
+	ID      *int   `json:"id"`
+	Error   struct {
+		Code    int    `json:"code"`
+		Message string `json:"message"`
+	} `json:"error"`
+}
+
 func writeJSONRPCError(w http.ResponseWriter, status int, rpcCode int, message string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	_, _ = w.Write([]byte(`{"jsonrpc":"2.0","id":null,"error":{"code":` +
-		jsonInt(rpcCode) + `,"message":` + jsonString(message) + `}}`))
-}
-
-func jsonInt(n int) string {
-	b, _ := json.Marshal(n)
-	return string(b)
-}
-
-func jsonString(s string) string {
-	b, _ := json.Marshal(s)
-	return string(b)
+	_ = json.NewEncoder(w).Encode(jsonrpcError{
+		JSONRPC: "2.0",
+		ID:      nil,
+		Error: struct {
+			Code    int    `json:"code"`
+			Message string `json:"message"`
+		}{Code: rpcCode, Message: message},
+	})
 }
 
 // checkRegisterAPIKey validates HUB_REGISTER_API_KEY if configured.
@@ -103,9 +109,15 @@ func (h *Hub) HandleDeviceMCP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Re-encode via json to prevent XSS (avoids direct w.Write of raw device response)
+	var v interface{}
+	if err := json.Unmarshal(resp, &v); err != nil {
+		writeJSONRPCError(w, http.StatusBadGateway, -32603, "invalid response from device")
+		return
+	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write(resp)
+	_ = json.NewEncoder(w).Encode(v)
 }
 
 // HandleHealth returns health status
