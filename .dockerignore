@@ -1,0 +1,27 @@
+# Prevent secrets and credentials from being copied into build context.
+# Docker does NOT use .gitignore - we must explicitly exclude sensitive files here.
+
+# Environment files (may contain HUB_REGISTER_API_KEY and other secrets)
+.env
+.env.*
+
+# Credential store (bcrypt hashes; runtime data, not build-time)
+data/
+*.devices.json
+
+# Git and version control
+.git
+.gitignore
+
+# Build artifacts
+mcp-ws-hub
+
+# Documentation and design (not needed in runtime image)
+*.md
+design.md
+
+# IDE and editor
+.idea
+.vscode
+*.swp
+*.swo
