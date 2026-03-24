@@ -83,6 +83,8 @@ docker run -p 8082:8082 \
   datumbridge-mcp-ws-hub
 ```
 
+The image does not bake hub settings with `ENV` (so nothing sensitive or operational ends up in image metadata from `docker inspect`). Defaults: port `8082`, credentials file `data/devices.json` relative to `WORKDIR /` → `/data/devices.json` with the volume above. Override with `-e HUB_PORT`, `-e HUB_CREDENTIALS_FILE`, etc., as needed.
+
 - **Health check**: `curl http://localhost:8082/health`
 - **Test UI**: `http://localhost:8082/`
 

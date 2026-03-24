@@ -1,5 +1,8 @@
-# Build only explicit source paths — never COPY entire context (avoids leaking .env / secrets into layers).
-# Runtime secrets: pass via `docker run -e` or Kubernetes secrets + env; credential file: volume mount to /data.
+# syntax=docker/dockerfile:1
+# Build: copy only source trees (no full-context COPY — avoids baking .env / local secrets into layers).
+# Runtime: do not use Dockerfile ENV/ARG for app secrets — they persist in image config (`docker inspect`).
+#   Pass config at run time: `docker run -e HUB_REGISTER_API_KEY=... -e HUB_ALLOWED_ORIGINS=... -v hub-data:/data ...`
+#   Optional: BuildKit secret mounts only if a future build step truly needs a secret (e.g. private module fetch).
 FROM golang:1.24-alpine AS builder
 WORKDIR /app
 COPY go.mod go.sum ./
@@ -11,18 +14,15 @@ RUN CGO_ENABLED=0 go build -o /mcp-ws-hub ./cmd/api
 FROM alpine:3.19
 RUN apk --no-cache add ca-certificates curl
 
-# Create non-root user
 RUN addgroup -g 1000 -S appuser && \
     adduser -u 1000 -S appuser -G appuser -s /sbin/nologin
 
 COPY --from=builder /mcp-ws-hub /mcp-ws-hub
 
-# Create data directory owned by appuser
 RUN mkdir -p /data && chown appuser:appuser /data
 
-# Non-secret defaults only (API keys and similar must be supplied at runtime, not at build).
-ENV HUB_PORT=8082 \
-    HUB_CREDENTIALS_FILE=/data/devices.json
+# Process CWD `/` + app default `data/devices.json` => persist credentials at /data/devices.json (mount a volume here).
+WORKDIR /
 
 EXPOSE 8082
 
