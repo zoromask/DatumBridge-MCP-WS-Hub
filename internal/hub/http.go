@@ -109,15 +109,15 @@ func (h *Hub) HandleDeviceMCP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Re-encode via json to prevent XSS (avoids direct w.Write of raw device response)
-	var v interface{}
-	if err := json.Unmarshal(resp, &v); err != nil {
+	// Validate JSON and re-emit via json.RawMessage (concrete type; avoids CWE-502 interface{} decode).
+	var payload json.RawMessage
+	if err := json.Unmarshal(resp, &payload); err != nil {
 		writeJSONRPCError(w, http.StatusBadGateway, -32603, "invalid response from device")
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	_ = json.NewEncoder(w).Encode(v)
+	_ = json.NewEncoder(w).Encode(payload)
 }
 
 // HandleHealth returns health status

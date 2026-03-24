@@ -60,7 +60,7 @@ Pairing codes expire after 5 minutes.
 | `HUB_PORT` | `8082` | HTTP/WS listen port |
 | `HUB_CREDENTIALS_FILE` | `./data/devices.json` | Path to persist device credentials |
 | `HUB_REGISTER_API_KEY` | _(empty = open)_ | API key for `/register` endpoint (X-API-Key or Bearer) |
-| `HUB_ALLOWED_ORIGINS` | _(empty = allow all)_ | Comma-separated allowed CORS/WS origins |
+| `HUB_ALLOWED_ORIGINS` | _(empty: WebSocket same-origin or no `Origin`; HTTP CORS still echoes caller `Origin`)_ | Comma-separated origins (exact match) for WebSocket; same list restricts CORS when set |
 | `LOG_LEVEL` | `INFO` | Log level: DEBUG, INFO, WARN, ERROR |
 
 ### Run Locally

@@ -1,8 +1,11 @@
+# Build only explicit source paths — never COPY entire context (avoids leaking .env / secrets into layers).
+# Runtime secrets: pass via `docker run -e` or Kubernetes secrets + env; credential file: volume mount to /data.
 FROM golang:1.24-alpine AS builder
 WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
-COPY . .
+COPY cmd/ ./cmd/
+COPY internal/ ./internal/
 RUN CGO_ENABLED=0 go build -o /mcp-ws-hub ./cmd/api
 
 FROM alpine:3.19
@@ -17,6 +20,7 @@ COPY --from=builder /mcp-ws-hub /mcp-ws-hub
 # Create data directory owned by appuser
 RUN mkdir -p /data && chown appuser:appuser /data
 
+# Non-secret defaults only (API keys and similar must be supplied at runtime, not at build).
 ENV HUB_PORT=8082 \
     HUB_CREDENTIALS_FILE=/data/devices.json
 

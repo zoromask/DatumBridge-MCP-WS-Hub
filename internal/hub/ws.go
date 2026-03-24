@@ -31,29 +31,33 @@ func checkSameOrigin(r *http.Request) bool {
 	return u.Host == r.Host
 }
 
-func newUpgrader() websocket.Upgrader {
+// ValidateWebSocketOrigin enforces trusted origins for the WebSocket handshake (CSRF mitigation).
+// When HUB_ALLOWED_ORIGINS is unset: same-origin or missing Origin only.
+// When set: request Origin must exactly match one listed value (no "*" wildcard).
+func ValidateWebSocketOrigin(r *http.Request) bool {
 	origins := parseAllowedOrigins()
+	if len(origins) == 0 {
+		return checkSameOrigin(r)
+	}
+	origin := r.Header.Get("Origin")
+	for _, o := range origins {
+		if o == origin {
+			return true
+		}
+	}
+	return false
+}
+
+func newUpgrader() websocket.Upgrader {
 	return websocket.Upgrader{
 		ReadBufferSize:  1024,
 		WriteBufferSize: 1024,
-		CheckOrigin: func(r *http.Request) bool {
-			if len(origins) == 0 {
-				// Not configured: use same-origin check to prevent CSRF (per gorilla/websocket docs)
-				return checkSameOrigin(r)
-			}
-			origin := r.Header.Get("Origin")
-			for _, o := range origins {
-				if o == "*" || o == origin {
-					return true
-				}
-			}
-			return false
-		},
+		CheckOrigin:     ValidateWebSocketOrigin,
 	}
 }
 
 // parseAllowedOrigins reads HUB_ALLOWED_ORIGINS (comma-separated).
-// Empty or unset means allow all origins (development mode).
+// Empty or unset means WebSocket uses same-origin / missing-Origin only (see ValidateWebSocketOrigin).
 func parseAllowedOrigins() []string {
 	raw := os.Getenv("HUB_ALLOWED_ORIGINS")
 	if raw == "" {
@@ -84,6 +88,11 @@ func (h *Hub) HandleWS(w http.ResponseWriter, r *http.Request) {
 	}
 	if !h.creds.ValidateToken(deviceID, token) {
 		http.Error(w, "invalid or revoked device credential", http.StatusUnauthorized)
+		return
+	}
+
+	if !ValidateWebSocketOrigin(r) {
+		http.Error(w, "WebSocket origin not allowed", http.StatusForbidden)
 		return
 	}
 
