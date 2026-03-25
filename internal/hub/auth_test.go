@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func TestRegisterDeviceAndValidate(t *testing.T) {
@@ -192,11 +193,17 @@ func TestPairingFlow(t *testing.T) {
 		t.Fatalf("expected device_id=pair-dev, got %s", cred.DeviceID)
 	}
 
-	ps.Add(code, cred)
+	ps.Add(code, cred, time.Now().Add(5*time.Minute))
 
 	pending := ps.List()
 	if len(pending) != 1 {
 		t.Fatalf("expected 1 pending pairing, got %d", len(pending))
+	}
+	if pending[0].DeviceID != "pair-dev" {
+		t.Fatalf("expected pending device_id=pair-dev, got %q", pending[0].DeviceID)
+	}
+	if pending[0].PairingCode != code {
+		t.Fatalf("expected pending pairing_code=%s, got %q", code, pending[0].PairingCode)
 	}
 
 	consumed, ok := ps.Consume(code)
@@ -213,6 +220,14 @@ func TestPairingFlow(t *testing.T) {
 	}
 }
 
+func TestPairingExpiredDroppedFromList(t *testing.T) {
+	ps := newPairingStore()
+	ps.Add("000000", &DeviceCredential{DeviceID: "gone", Token: "t"}, time.Now().Add(-time.Second))
+	if len(ps.List()) != 0 {
+		t.Fatalf("expected expired pairing pruned, got %d entries", len(ps.List()))
+	}
+}
+
 func TestPairingWithMetadata(t *testing.T) {
 	s := newCredentialStore("")
 	ps := newPairingStore()
@@ -222,7 +237,7 @@ func TestPairingWithMetadata(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	ps.Add(code, cred)
+	ps.Add(code, cred, time.Now().Add(5*time.Minute))
 	consumed, ok := ps.Consume(code)
 	if !ok {
 		t.Fatal("expected Consume to succeed")

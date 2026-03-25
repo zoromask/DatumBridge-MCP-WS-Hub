@@ -195,7 +195,21 @@ func generatePairingCode() (string, error) {
 	return fmt.Sprintf("%06d", n.Int64()), nil
 }
 
-// StartPairing creates a pending pairing with a 6-digit code. Expires after 5 minutes.
+// PairingTTL returns how long a pairing code stays valid.
+// Override with HUB_PAIRING_TTL (Go duration: 5m, 10m, 1h). Invalid or empty uses 5m.
+func PairingTTL() time.Duration {
+	s := strings.TrimSpace(os.Getenv("HUB_PAIRING_TTL"))
+	if s == "" {
+		return 5 * time.Minute
+	}
+	d, err := time.ParseDuration(s)
+	if err != nil || d <= 0 {
+		return 5 * time.Minute
+	}
+	return d
+}
+
+// StartPairing creates a pending pairing with a 6-digit code. Caller must pairingStore.Add(..., expiresAt) using PairingTTL().
 func (s *credentialStore) StartPairing(deviceID string) (pairingCode string, cred *DeviceCredential, err error) {
 	token, err := generateToken()
 	if err != nil {
@@ -212,27 +226,34 @@ func (s *credentialStore) StartPairing(deviceID string) (pairingCode string, cre
 	return code, cred, nil
 }
 
-func (p *pairingStore) Add(code string, cred *DeviceCredential) {
+func (p *pairingStore) Add(code string, cred *DeviceCredential, expiresAt time.Time) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	p.store[code] = &pairingEntry{cred: cred, expires: time.Now().Add(5 * time.Minute)}
+	p.store[code] = &pairingEntry{cred: cred, expires: expiresAt}
 }
 
 // PendingPairing is a non-sensitive view of a pending pairing for the UI
 type PendingPairing struct {
+	DeviceID    string    `json:"device_id"`
 	PairingCode string    `json:"pairing_code"`
 	ExpiresAt   time.Time `json:"expires_at"`
 }
 
 func (p *pairingStore) List() []PendingPairing {
-	p.mu.RLock()
-	defer p.mu.RUnlock()
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	now := time.Now()
 	var out []PendingPairing
 	for code, ent := range p.store {
-		if now.Before(ent.expires) {
-			out = append(out, PendingPairing{PairingCode: code, ExpiresAt: ent.expires})
+		if !now.Before(ent.expires) {
+			delete(p.store, code)
+			continue
 		}
+		did := ""
+		if ent.cred != nil {
+			did = ent.cred.DeviceID
+		}
+		out = append(out, PendingPairing{DeviceID: did, PairingCode: code, ExpiresAt: ent.expires})
 	}
 	return out
 }

@@ -153,9 +153,17 @@ func (h *Hub) HandleRevokeDevice(w http.ResponseWriter, r *http.Request) {
 // HandleListPendingPairings returns pending pairing codes (for test UI)
 func (h *Hub) HandleListPendingPairings(w http.ResponseWriter, _ *http.Request) {
 	pending := h.pairingStore.List()
+	ttl := PairingTTL()
+	ttlSec := int(ttl / time.Second)
+	if ttlSec < 1 {
+		ttlSec = 1
+	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	_ = json.NewEncoder(w).Encode(map[string]interface{}{"pairings": pending})
+	_ = json.NewEncoder(w).Encode(map[string]interface{}{
+		"pairings":              pending,
+		"pairing_ttl_seconds":   ttlSec,
+	})
 }
 
 // RegisterDeviceRequest is the body for POST /api/v1/devices/register
@@ -169,10 +177,11 @@ type RegisterDeviceRequest struct {
 
 // RegisterDeviceResponse is the response from POST /api/v1/devices/register
 type RegisterDeviceResponse struct {
-	DeviceID    string `json:"device_id,omitempty"`
-	Token       string `json:"token,omitempty"`
-	PairingCode string `json:"pairing_code,omitempty"`
-	DeviceName  string `json:"device_name,omitempty"`
+	DeviceID    string     `json:"device_id,omitempty"`
+	Token       string     `json:"token,omitempty"`
+	PairingCode string     `json:"pairing_code,omitempty"`
+	ExpiresAt   *time.Time `json:"expires_at,omitempty"`
+	DeviceName  string     `json:"device_name,omitempty"`
 }
 
 // ConfirmPairingRequest is the body for POST /api/v1/devices/register/confirm
@@ -210,12 +219,16 @@ func (h *Hub) HandleRegisterDevice(w http.ResponseWriter, r *http.Request) {
 			writeAPIError(w, http.StatusInternalServerError, "INTERNAL_ERROR", "failed to generate pairing", true)
 			return
 		}
-		h.pairingStore.Add(code, cred)
-		log.Info().Str("pairing_code", code).Msg("new pairing request — enter this code in zeroclaw register")
+		expiresAt := time.Now().Add(PairingTTL())
+		h.pairingStore.Add(code, cred, expiresAt)
+		log.Info().Str("device_id", cred.DeviceID).Str("pairing_code", code).Time("expires_at", expiresAt).Msg("new pairing request — enter this code in zeroclaw register")
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
+		exp := expiresAt
 		_ = json.NewEncoder(w).Encode(RegisterDeviceResponse{
+			DeviceID:    cred.DeviceID,
 			PairingCode: code,
+			ExpiresAt:   &exp,
 		})
 		return
 	}

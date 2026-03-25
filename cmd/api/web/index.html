@@ -94,6 +94,17 @@
 
     /* ── Pairing display ── */
     .pairing-code { font-size: 2rem; font-weight: 700; letter-spacing: 0.3em; color: #60a5fa; text-align: center; padding: 1rem; }
+    .pairing-pending-row { padding: 1rem; border-bottom: 1px solid #27272a; }
+    .pairing-pending-row:last-child { border-bottom: none; }
+    .pairing-pending-label { font-size: 0.6875rem; text-transform: uppercase; letter-spacing: 0.06em; color: #52525b; margin-bottom: 0.25rem; }
+    .pairing-pending-device { font-family: ui-monospace, monospace; font-size: 0.8125rem; color: #a1a1aa; word-break: break-all; margin-bottom: 0.75rem; line-height: 1.4; }
+    .pairing-countdown { font-family: ui-monospace, monospace; font-size: 1.125rem; font-weight: 700; color: #4ade80; letter-spacing: 0.04em; margin-bottom: 0.375rem; }
+    .pairing-pending-row.pairing-soon .pairing-countdown { color: #fbbf24; }
+    .pairing-pending-row.pairing-expired .pairing-countdown { color: #f87171; }
+    .pairing-pending-row.pairing-expired { opacity: 0.7; }
+    .pairing-pending-row.pairing-expired .pairing-code { color: #71717a; }
+    .pairing-renew-hint { font-size: 0.6875rem; color: #52525b; line-height: 1.4; }
+    .pairing-renew-hint code { background: #27272a; padding: 0.0625rem 0.3125rem; border-radius: 4px; font-size: 0.625rem; }
 
     /* ── MCP Console ── */
     .console-response { min-height: 100px; font-family: ui-monospace, monospace; font-size: 0.75rem; white-space: pre-wrap; word-break: break-all; background: #111114; border: 1px solid #27272a; border-radius: 8px; padding: 0.75rem; margin-top: 0.5rem; max-height: 500px; overflow-y: auto; }
@@ -108,9 +119,62 @@
     .mt-1 { margin-top: 0.5rem; }
     .mt-2 { margin-top: 1rem; }
     .gap-row { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+
+    /* ── Admin pairing toasts ── */
+    .toast-stack {
+      position: fixed;
+      top: 1rem;
+      right: 1rem;
+      z-index: 10000;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      max-width: min(400px, calc(100vw - 2rem));
+      pointer-events: none;
+    }
+    .toast {
+      pointer-events: auto;
+      background: #18181b;
+      border: 1px solid #2563eb;
+      border-radius: 10px;
+      padding: 0.875rem 2.25rem 0.75rem 1rem;
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55);
+      animation: toast-in 0.22s ease-out;
+      position: relative;
+      cursor: pointer;
+    }
+    .toast:hover { border-color: #60a5fa; }
+    .toast-close {
+      position: absolute;
+      top: 0.375rem;
+      right: 0.375rem;
+      width: 1.75rem;
+      height: 1.75rem;
+      border: none;
+      border-radius: 6px;
+      background: transparent;
+      color: #71717a;
+      font-size: 1.25rem;
+      line-height: 1;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+    }
+    .toast-close:hover { background: #27272a; color: #e4e4e7; }
+    .toast-title { font-size: 0.8125rem; font-weight: 700; color: #e4e4e7; margin-bottom: 0.5rem; }
+    .toast-line { font-family: ui-monospace, monospace; font-size: 0.75rem; color: #a1a1aa; margin-bottom: 0.25rem; line-height: 1.4; word-break: break-all; }
+    .toast-line .toast-code { color: #60a5fa; font-weight: 600; letter-spacing: 0.12em; }
+    .toast-hint { font-size: 0.625rem; color: #52525b; margin-top: 0.5rem; }
+    @keyframes toast-in {
+      from { opacity: 0; transform: translateX(8px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
   </style>
 </head>
 <body>
+  <div id="admin-toast-stack" class="toast-stack" aria-live="polite" aria-relevant="additions"></div>
   <!-- ════════════ SIDEBAR ════════════ -->
   <aside class="sidebar">
     <div class="sidebar-brand">
@@ -147,6 +211,9 @@
     </nav>
     <div class="sidebar-footer" id="sidebar-footer">
       <span id="device-count">0</span> device(s) registered
+      <div id="admin-notify-prompt" class="mt-1" style="display:none;">
+        <button type="button" class="btn btn-ghost btn-sm" id="btn-enable-pairing-alerts" style="width:100%;font-size:0.6875rem;padding:0.375rem 0.5rem;">Browser alerts for new pairings</button>
+      </div>
     </div>
   </aside>
 
@@ -204,7 +271,7 @@
     <!-- ──── PAGE: Pairing (admin) ──── -->
     <div class="page" id="page-pairing">
       <div class="page-title">Pairing</div>
-      <div class="page-subtitle">Pending pairing codes for device registration</div>
+      <div class="page-subtitle" id="pairing-page-subtitle">Pending pairing codes for device registration</div>
       <div class="gap-row mb-1">
         <button class="btn btn-ghost btn-sm" id="adm-refresh-pairings">Refresh</button>
       </div>
@@ -252,6 +319,9 @@
   </div>
 
   <script>
+    function escapeHtml(s) {
+      return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
     const base = window.location.origin;
     const isAdmin = new URLSearchParams(window.location.search).get('admin') === 'true';
     let cachedTools = [];
@@ -259,9 +329,138 @@
     let gwTargetDeviceId = null;
     let statusPollTimer = null;
 
+    /** @type {Set<string>} */
+    let knownPairingKeys = new Set();
+    let pairingsPollInitialized = false;
+
+    function pairingKey(p) {
+      return (p.device_id || '') + '\0' + (p.pairing_code || '');
+    }
+
+    function describePairingTtl(totalSec) {
+      const sec = Math.max(1, Math.floor(Number(totalSec) || 0));
+      const h = Math.floor(sec / 3600);
+      const m = Math.floor((sec % 3600) / 60);
+      const s = sec % 60;
+      if (h > 0) return h + 'h ' + m + 'm';
+      if (m > 0) return s > 0 ? m + 'm ' + s + 's' : m + 'm';
+      return s + 's';
+    }
+
+    function formatPairingRemain(ms) {
+      if (ms <= 0) return 'Expired — renew with register';
+      const sec = Math.ceil(ms / 1000);
+      const h = Math.floor(sec / 3600);
+      const m = Math.floor((sec % 3600) / 60);
+      const r = sec % 60;
+      if (h > 0) return h + ':' + String(m).padStart(2, '0') + ':' + String(r).padStart(2, '0');
+      return m + ':' + String(r).padStart(2, '0');
+    }
+
+    function updatePairingCountdowns() {
+      document.querySelectorAll('.pairing-pending-row[data-expires]').forEach(row => {
+        const iso = row.getAttribute('data-expires');
+        const el = row.querySelector('.pairing-countdown');
+        if (!el || !iso) return;
+        const end = Date.parse(iso);
+        if (Number.isNaN(end)) {
+          el.textContent = '—';
+          return;
+        }
+        const ms = end - Date.now();
+        el.textContent = formatPairingRemain(ms);
+        row.classList.toggle('pairing-soon', ms > 0 && ms <= 60000);
+        row.classList.toggle('pairing-expired', ms <= 0);
+      });
+    }
+
+    function openPairingPage() {
+      document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+      const nav = document.querySelector('.nav-item[data-page="pairing"]');
+      const page = document.getElementById('page-pairing');
+      if (nav) nav.classList.add('active');
+      if (page) page.classList.add('active');
+    }
+
+    function showPairingRequestToasts(newPairings) {
+      if (!newPairings.length) return;
+      const stack = document.getElementById('admin-toast-stack');
+      if (!stack) return;
+
+      const toast = document.createElement('div');
+      toast.className = 'toast';
+      toast.setAttribute('role', 'alert');
+      const title = newPairings.length === 1 ? 'New pairing request' : `${newPairings.length} new pairing requests`;
+      const linesHtml = newPairings.map(p => {
+        const did = escapeHtml(p.device_id || '—');
+        const code = escapeHtml(p.pairing_code || '');
+        return `<div class="toast-line"><span class="toast-did">${did}</span> · <span class="toast-code">${code}</span></div>`;
+      }).join('');
+
+      toast.innerHTML = `<button type="button" class="toast-close" aria-label="Dismiss">&times;</button>
+        <div class="toast-title">${escapeHtml(title)}</div>${linesHtml}
+        <div class="toast-hint">Live countdown on Pairing page · Click to open</div>`;
+
+      const dismissMs = 14000;
+      let dismissTimer = null;
+      const removeToast = () => {
+        if (dismissTimer) clearTimeout(dismissTimer);
+        toast.remove();
+      };
+      function scheduleDismiss() {
+        if (dismissTimer) clearTimeout(dismissTimer);
+        dismissTimer = setTimeout(removeToast, dismissMs);
+      }
+
+      toast.querySelector('.toast-close').onclick = (e) => { e.stopPropagation(); removeToast(); };
+      toast.onclick = () => {
+        openPairingPage();
+        loadPairings();
+        removeToast();
+      };
+
+      stack.appendChild(toast);
+      scheduleDismiss();
+      toast.addEventListener('mouseenter', () => { if (dismissTimer) clearTimeout(dismissTimer); });
+      toast.addEventListener('mouseleave', scheduleDismiss);
+
+      if (typeof Notification === 'function' && Notification.permission === 'granted') {
+        try {
+          const nBody = newPairings.length === 1
+            ? `${newPairings[0].device_id || 'device'} — ${newPairings[0].pairing_code || ''} (${newPairings[0].expires_at ? formatPairingRemain(Date.parse(newPairings[0].expires_at) - Date.now()) : 'limited time'})`
+            : `${newPairings.length} devices pending — open Pairing for countdown.`;
+          const n = new Notification(title, { body: nBody, tag: 'datumbridge-pairing' });
+          n.onclick = () => { window.focus(); openPairingPage(); n.close(); };
+        } catch (_) {/* ignore */}
+      }
+    }
+
+    function updateNotifyPrompt() {
+      const wrap = document.getElementById('admin-notify-prompt');
+      if (!isAdmin || !wrap || typeof Notification === 'undefined') return;
+      if (Notification.permission === 'default') {
+        wrap.style.display = 'block';
+      } else {
+        wrap.style.display = 'none';
+      }
+    }
+
     // ── Admin visibility ──
     if (isAdmin) {
       document.querySelectorAll('.admin-only').forEach(el => el.style.display = '');
+      updateNotifyPrompt();
+      const btnNotify = document.getElementById('btn-enable-pairing-alerts');
+      if (btnNotify) {
+        btnNotify.onclick = async () => {
+          if (typeof Notification === 'undefined') return;
+          try {
+            await Notification.requestPermission();
+          } catch (_) {}
+          updateNotifyPrompt();
+        };
+      }
+      setInterval(updatePairingCountdowns, 1000);
     }
 
     // ── Page navigation ──
@@ -641,11 +840,47 @@
         const r = await fetch(base + '/api/v1/pairing/pending');
         const j = await r.json();
         const list = j.pairings || [];
+
+        if (isAdmin && typeof j.pairing_ttl_seconds === 'number' && j.pairing_ttl_seconds > 0) {
+          const sub = document.getElementById('pairing-page-subtitle');
+          if (sub) {
+            sub.textContent = 'Pending codes (valid ' + describePairingTtl(j.pairing_ttl_seconds) + ' each). When the timer reaches zero the code is invalid — run register again on the device to renew.';
+          }
+        }
+
+        if (isAdmin) {
+          const keysNow = new Set(list.map(pairingKey));
+          if (!pairingsPollInitialized) {
+            knownPairingKeys = keysNow;
+            pairingsPollInitialized = true;
+          } else {
+            const newly = list.filter(p => !knownPairingKeys.has(pairingKey(p)));
+            if (newly.length) {
+              showPairingRequestToasts(newly);
+            }
+            knownPairingKeys = keysNow;
+          }
+        }
+
         const el = document.getElementById('adm-pairings-list');
         if (list.length === 0) {
           el.innerHTML = '<div class="empty-state">No pending pairings.<br>Run <code>zeroclaw register</code> to create one.</div>';
         } else {
-          el.innerHTML = list.map(p => `<div class="pairing-code">${p.pairing_code}</div>`).join('');
+          el.innerHTML = list.map(p => {
+            const expRaw = p.expires_at != null ? String(p.expires_at) : '';
+            const expAttr = expRaw ? escapeHtml(expRaw) : '';
+            return `
+            <div class="pairing-pending-row"${expAttr ? ` data-expires="${expAttr}"` : ''}>
+              <div class="pairing-pending-label">Device ID</div>
+              <div class="pairing-pending-device">${escapeHtml(p.device_id || '—')}</div>
+              <div class="pairing-pending-label">Pairing code</div>
+              <div class="pairing-code">${escapeHtml(p.pairing_code || '')}</div>
+              <div class="pairing-pending-label">Time remaining</div>
+              <div class="pairing-countdown">…</div>
+              <div class="pairing-renew-hint">After expiry, run <code>register</code> on the device to obtain a new code.</div>
+            </div>`;
+          }).join('');
+          updatePairingCountdowns();
         }
       } catch (_) {}
     }
