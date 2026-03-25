@@ -58,8 +58,8 @@ func main() {
 	r.HandleFunc("/api/v1/pairing/pending", h.HandleListPendingPairings).Methods("GET")
 	r.PathPrefix("/").Handler(http.FileServer(http.FS(webRoot)))
 
-	// Apply middleware: CORS (outermost) -> Logging -> Router
-	handler := hub.CORSMiddleware(hub.LoggingMiddleware(r))
+	// Apply middleware: CORS (outermost) -> Logging -> optional /api/ws-hub strip -> Router
+	handler := hub.CORSMiddleware(hub.LoggingMiddleware(hub.OptionalStudioProxyStripMiddleware(r)))
 
 	port := os.Getenv("HUB_PORT")
 	if port == "" {

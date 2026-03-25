@@ -37,6 +37,39 @@ func (sr *statusRecorder) Flush() {
 	}
 }
 
+// studioProxyPathPrefix is the path DatumBridge Studio uses when proxying to this hub
+// (see datumbridge-studio nginx.conf / vite proxy). Some ingress setups forward the full
+// client path without stripping the prefix; without this middleware those requests hit the
+// embedded static FileServer, which returns 405 for POST (e.g. device register).
+const studioProxyPathPrefix = "/api/ws-hub"
+
+// OptionalStudioProxyStripMiddleware removes leading /api/ws-hub from the request path when
+// present so routing matches handlers registered at /api/v1/..., /ws, /mcp, etc.
+// Disable by setting HUB_HTTP_STRIP_PREFIX=0 (or "false").
+func OptionalStudioProxyStripMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if v := strings.TrimSpace(strings.ToLower(os.Getenv("HUB_HTTP_STRIP_PREFIX"))); v == "0" || v == "false" || v == "no" {
+			next.ServeHTTP(w, r)
+			return
+		}
+		p := r.URL.Path
+		if p != studioProxyPathPrefix && !strings.HasPrefix(p, studioProxyPathPrefix+"/") {
+			next.ServeHTTP(w, r)
+			return
+		}
+		newPath := strings.TrimPrefix(p, studioProxyPathPrefix)
+		if newPath == "" {
+			newPath = "/"
+		}
+		r2 := r.Clone(r.Context())
+		u := *r.URL
+		u.Path = newPath
+		u.RawPath = ""
+		r2.URL = &u
+		next.ServeHTTP(w, r2)
+	})
+}
+
 // LoggingMiddleware logs method, path, status, and duration for every request.
 func LoggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

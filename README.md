@@ -89,6 +89,30 @@ The image does not bake hub settings with `ENV` (so nothing sensitive or operati
 - **Health check**: `curl http://localhost:8000/health`
 - **Test UI**: `http://localhost:8000/`
 
+## Kubernetes: Studio proxy, edge URLs, and in-cluster registration
+
+Inside the cluster, `datumbridge-mcp` typically registers tools using an **internal** URL like
+`http://{slug}-{version}.{namespace}.svc.cluster.local:{port}`. **Edge devices and browsers outside the cluster cannot use that DNS name.**
+
+In the **DatumBridge stack**, you front the hub through **DatumBridge Studio**—same pattern as **`/api/mcp`** and the agent API. Studio reverse-proxies **`/api/ws-hub`** to the **`datumbridge-mcp-ws-hub`** Service (container port **`8000`** by default; align `server_port` in Tool Registry with the hub process).
+
+- **Edge / browser HTTP base**: `https://<studio-host>/api/ws-hub`
+- **Device WebSocket URL**: `wss://<studio-host>/api/ws-hub/ws`
+
+Your **Studio** ingress (or load balancer) must allow **WebSocket upgrades** on `/api/ws-hub/` (pass `Upgrade` and `Connection`, with sufficient proxy read/send timeouts—see Studio `nginx.conf`).
+
+1. **Service**: Ensure a Kubernetes `Service` for the hub Deployment is reachable from Studio at the name/port configured in Studio (e.g. `http://datumbridge-mcp-ws-hub:8000/`).
+
+2. **TLS**: Terminate HTTPS at Studio; edge clients use **`https://`** / **`wss://`** via the Studio host, not a separate public hostname for the hub.
+
+3. **`HUB_ALLOWED_ORIGINS`**: Set to the exact Studio origin allowed to open browser WebSocket connections (e.g. `https://studio.example.com`). If unset, same-origin / missing-`Origin` behavior applies (see code).
+
+4. **CORS**: The hub's middleware echoes `Origin` when allowed; keep values aligned with your Studio origin.
+
+5. **405 on POST (register / MCP)** — If your ingress forwards the **full** path (`/api/ws-hub/api/v1/...`) to the hub instead of stripping the prefix (Studio `nginx.conf` strips it), the request used to fall through to the static file server (**405**). The hub now strips a leading **`/api/ws-hub`** before routing. Set **`HUB_HTTP_STRIP_PREFIX=0`** only if your proxy never sends that prefix.
+
+**Standalone hub** (without Studio): expose the hub Service with its own Ingress/LB/NodePort, enable WebSockets on that path, and point clients at that host directly. The embedded test UI remains at `/` on the hub.
+
 ## DatumBridge MCP publish / Request Approve
 
 The platform’s MCP service calls `POST {baseURL}/mcp` with JSON-RPC `initialize` and `tools/list` (same contract as `google-drive-mcp` via FastMCP HTTP). This hub implements that subset so tools can be registered after deploy.
