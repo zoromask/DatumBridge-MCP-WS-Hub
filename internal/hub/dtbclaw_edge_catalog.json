@@ -1,0 +1,2306 @@
+{
+  "description": "Native octoclaw / DTBClaw tools for edge devices via MCP WS Hub. Regenerate with: cargo run --bin export_dtbclaw_edge_catalog",
+  "profile": "dtbclaw-default",
+  "tools": [
+    {
+      "description": "Safely check/apply a unified diff to the current git repository, optionally staging and committing.",
+      "inputSchema": {
+        "properties": {
+          "commit_message": {
+            "description": "If provided (and dry_run=false), stage all changes and create a git commit with this message.",
+            "type": "string"
+          },
+          "dry_run": {
+            "default": true,
+            "description": "If true, only checks whether the patch would apply cleanly (no changes made).",
+            "type": "boolean"
+          },
+          "patch": {
+            "description": "Unified diff text (e.g. output of `git diff`).",
+            "type": "string"
+          }
+        },
+        "required": [
+          "patch"
+        ],
+        "type": "object"
+      },
+      "mcpToolName": "apply_patch",
+      "name": "Edge: apply_patch",
+      "registryId": "edge_dtbclaw_apply_patch"
+    },
+    {
+      "description": "Execute a tool in the background and return a job ID immediately. Use this for long-running operations where you don't want to block. Check results with bg_status or wait for auto-injection in the next turn. Background tools have a 600-second maximum timeout.",
+      "inputSchema": {
+        "properties": {
+          "arguments": {
+            "description": "Arguments to pass to the tool",
+            "type": "object"
+          },
+          "tool": {
+            "description": "Name of the tool to execute in the background",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tool"
+        ],
+        "type": "object"
+      },
+      "mcpToolName": "bg_run",
+      "name": "Edge: bg_run",
+      "registryId": "edge_dtbclaw_bg_run"
+    },
+    {
+      "description": "Query the status of a background job by ID, or list all jobs if no ID provided. Returns job status (running/complete/failed), result output, and elapsed time.",
+      "inputSchema": {
+        "properties": {
+          "job_id": {
+            "description": "Optional job ID to query. If omitted, returns all jobs.",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "mcpToolName": "bg_status",
+      "name": "Edge: bg_status",
+      "registryId": "edge_dtbclaw_bg_status"
+    },
+    {
+      "description": "Web/browser automation with pluggable backends (agent-browser, rust-native, computer_use). Supports DOM actions plus optional OS-level actions (mouse_move, mouse_click, mouse_drag, key_type, key_press, screen_capture) through a computer-use sidecar. Use 'snapshot' to map interactive elements to refs (@e1, @e2). Enforces browser.allowed_domains for open actions.",
+      "inputSchema": {
+        "properties": {
+          "action": {
+            "description": "Browser action to perform (OS-level actions require backend=computer_use)",
+            "enum": [
+              "open",
+              "snapshot",
+              "click",
+              "fill",
+              "type",
+              "get_text",
+              "get_title",
+              "get_url",
+              "screenshot",
+              "wait",
+              "press",
+              "hover",
+              "scroll",
+              "is_visible",
+              "close",
+              "find",
+              "mouse_move",
+              "mouse_click",
+              "mouse_drag",
+              "key_type",
+              "key_press",
+              "screen_capture"
+            ],
+            "type": "string"
+          },
+          "button": {
+            "description": "Mouse button for computer_use mouse_click",
+            "enum": [
+              "left",
+              "right",
+              "middle"
+            ],
+            "type": "string"
+          },
+          "by": {
+            "description": "For find: semantic locator type",
+            "enum": [
+              "role",
+              "text",
+              "label",
+              "placeholder",
+              "testid"
+            ],
+            "type": "string"
+          },
+          "compact": {
+            "description": "For snapshot: remove empty structural elements",
+            "type": "boolean"
+          },
+          "depth": {
+            "description": "For snapshot: limit tree depth",
+            "type": "integer"
+          },
+          "direction": {
+            "description": "Scroll direction",
+            "enum": [
+              "up",
+              "down",
+              "left",
+              "right"
+            ],
+            "type": "string"
+          },
+          "fill_value": {
+            "description": "For find with fill action: value to fill",
+            "type": "string"
+          },
+          "find_action": {
+            "description": "For find: action to perform on found element",
+            "enum": [
+              "click",
+              "fill",
+              "text",
+              "hover",
+              "check"
+            ],
+            "type": "string"
+          },
+          "from_x": {
+            "description": "Drag source X coordinate (computer_use: mouse_drag)",
+            "type": "integer"
+          },
+          "from_y": {
+            "description": "Drag source Y coordinate (computer_use: mouse_drag)",
+            "type": "integer"
+          },
+          "full_page": {
+            "description": "For screenshot: capture full page",
+            "type": "boolean"
+          },
+          "interactive_only": {
+            "description": "For snapshot: only show interactive elements",
+            "type": "boolean"
+          },
+          "key": {
+            "description": "Key to press (Enter, Tab, Escape, etc.)",
+            "type": "string"
+          },
+          "ms": {
+            "description": "Milliseconds to wait",
+            "type": "integer"
+          },
+          "path": {
+            "description": "File path for screenshot",
+            "type": "string"
+          },
+          "pixels": {
+            "description": "Pixels to scroll",
+            "type": "integer"
+          },
+          "selector": {
+            "description": "Element selector: @ref (e.g. @e1), CSS (#id, .class), or text=...",
+            "type": "string"
+          },
+          "text": {
+            "description": "Text to type or wait for",
+            "type": "string"
+          },
+          "to_x": {
+            "description": "Drag target X coordinate (computer_use: mouse_drag)",
+            "type": "integer"
+          },
+          "to_y": {
+            "description": "Drag target Y coordinate (computer_use: mouse_drag)",
+            "type": "integer"
+          },
+          "url": {
+            "description": "URL to navigate to (for 'open' action)",
+            "type": "string"
+          },
+          "value": {
+            "description": "Value to fill or type",
+            "type": "string"
+          },
+          "x": {
+            "description": "Screen X coordinate (computer_use: mouse_move/mouse_click)",
+            "type": "integer"
+          },
+          "y": {
+            "description": "Screen Y coordinate (computer_use: mouse_move/mouse_click)",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "action"
+        ],
+        "type": "object"
+      },
+      "mcpToolName": "browser",
+      "name": "Edge: browser",
+      "registryId": "edge_dtbclaw_browser"
+    },
+    {
+      "description": "Open an approved HTTPS URL in a browser. Security constraints: allowlist-only domains, no local/private hosts, no scraping.",
+      "inputSchema": {
+        "properties": {
+          "url": {
+            "description": "HTTPS URL to open",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "type": "object"
+      },
+      "mcpToolName": "browser_open",
+      "name": "Edge: browser_open",
+      "registryId": "edge_dtbclaw_browser_open"
+    },
+    {
+      "description": "Inspect and update configurable ACK emoji reaction policies for Telegram/Discord/Lark/Feishu under [channels_config.ack_reaction]. Supports enabling/disabling reactions, setting emoji pools, and rule-based conditions.",
+      "inputSchema": {
+        "properties": {
+          "action": {
+            "description": "Operation to perform",
+            "enum": [
+              "get",
+              "set",
+              "add_rule",
+              "remove_rule",
+              "clear_rules",
+              "unset",
+              "simulate"
+            ],
+            "type": "string"
+          },
+          "channel": {
+            "enum": [
+              "telegram",
+              "discord",
+              "lark",
+              "feishu"
+            ],
+            "type": "string"
+          },
+          "chat_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "chat_type": {
+            "enum": [
+              "direct",
+              "group"
+            ],
+            "type": "string"
+          },
+          "defaults": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "emojis": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "index": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "locale_hint": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "rule": {
+            "type": "object"
+          },
+          "rules": {
+            "type": [
+              "array",
+              "null"
+            ]
+          },
+          "runs": {
+            "maximum": 1000,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "sample_rate": {
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "sender_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "strategy": {
+            "enum": [
+              "random",
+              "first",
+              null
+            ],
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "action"
+        ],
+        "type": "object"
+      },
+      "mcpToolName": "channel_ack_config",
+      "name": "Edge: channel_ack_config",
+      "registryId": "edge_dtbclaw_channel_ack_config"
+    },
+    {
+      "description": "Check current rate limit and quota status for AI providers. Returns available providers, rate-limited providers, quota remaining, and estimated reset time. Use this when user asks about model availability or when you encounter rate limit errors.",
+      "inputSchema": {
+        "properties": {
+          "provider": {
+            "description": "Specific provider to check (optional). Examples: openai, gemini, anthropic. If omitted, checks all providers.",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "mcpToolName": "check_provider_quota",
+      "name": "Edge: check_provider_quota",
+      "registryId": "edge_dtbclaw_check_provider_quota"
+    },
+    {
+      "description": "Search file contents by regex pattern within the workspace. Supports ripgrep (rg) with grep fallback. Output modes: 'content' (matching lines with context), 'files_with_matches' (file paths only), 'count' (match counts per file). Example: pattern='fn main', include='*.rs', output_mode='content'.",
+      "inputSchema": {
+        "properties": {
+          "case_sensitive": {
+            "default": true,
+            "description": "Case-sensitive matching. Defaults to true",
+            "type": "boolean"
+          },
+          "context_after": {
+            "default": 0,
+            "description": "Lines of context after each match (content mode only)",
+            "type": "integer"
+          },
+          "context_before": {
+            "default": 0,
+            "description": "Lines of context before each match (content mode only)",
+            "type": "integer"
+          },
+          "include": {
+            "description": "File glob filter, e.g. '*.rs', '*.{ts,tsx}'",
+            "type": "string"
+          },
+          "max_results": {
+            "default": 1000,
+            "description": "Maximum number of results to return. Defaults to 1000",
+            "type": "integer"
+          },
+          "multiline": {
+            "default": false,
+            "description": "Enable multiline matching (ripgrep only, errors on grep fallback)",
+            "type": "boolean"
+          },
+          "output_mode": {
+            "default": "content",
+            "description": "Output format: 'content' (matching lines), 'files_with_matches' (paths only), 'count' (match counts)",
+            "enum": [
+              "content",
+              "files_with_matches",
+              "count"
+            ],
+            "type": "string"
+          },
+          "path": {
+            "default": ".",
+            "description": "Directory to search in, relative to workspace root. Defaults to '.'",
+            "type": "string"
+          },
+          "pattern": {
+            "description": "Regular expression pattern to search for",
+            "type": "string"
+          }
+        },
+        "required": [
+          "pattern"
+        ],
+        "type": "object"
+      },
+      "mcpToolName": "content_search",
+      "name": "Edge: content_search",
+      "registryId": "edge_dtbclaw_content_search"
+    },
+    {
+      "description": "Create a scheduled cron job (shell or agent) with cron/at/every schedules. Use job_type='agent' with a prompt to run the AI agent on schedule. Use schedule.kind='at' for one-time reminders/delayed sends (recommended). Agent jobs with schedule.kind='cron' or schedule.kind='every' are recurring and require explicit recurring confirmation. To deliver output to a channel (Discord, Telegram, Slack, Mattermost, QQ, Napcat, Lark, Feishu, Email), set delivery={\"mode\":\"announce\",\"channel\":\"discord\",\"to\":\"<channel_id_or_chat_id>\"}. This is the preferred tool for sending scheduled/delayed messages to users via channels.",
+      "inputSchema": {
+        "properties": {
+          "approved": {
+            "default": false,
+            "description": "Set true to explicitly approve medium/high-risk shell commands in supervised mode",
+            "type": "boolean"
+          },
+          "command": {
+            "type": "string"
+          },
+          "delete_after_run": {
+            "type": "boolean"
+          },
+          "delivery": {
+            "description": "Delivery config to send job output to a channel. Example: {\"mode\":\"announce\",\"channel\":\"discord\",\"to\":\"<channel_id>\"}",
+            "properties": {
+              "best_effort": {
+                "description": "If true, delivery failure does not fail the job",
+                "type": "boolean"
+              },
+              "channel": {
+                "description": "Channel type to deliver to",
+                "enum": [
+                  "telegram",
+                  "discord",
+                  "slack",
+                  "mattermost",
+                  "qq",
+                  "napcat",
+                  "lark",
+                  "feishu",
+                  "email"
+                ],
+                "type": "string"
+              },
+              "mode": {
+                "description": "Set to 'announce' to deliver output to a channel",
+                "enum": [
+                  "none",
+                  "announce"
+                ],
+                "type": "string"
+              },
+              "to": {
+                "description": "Target: Discord channel ID, Telegram chat ID, Slack channel, etc.",
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "job_type": {
+            "enum": [
+              "shell",
+              "agent"
+            ],
+            "type": "string"
+          },
+          "model": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "prompt": {
+            "type": "string"
+          },
+          "recurring_confirmed": {
+            "default": false,
+            "description": "Required for agent recurring schedules (schedule.kind='cron' or 'every'). Set true only when recurring behavior is intentional.",
+            "type": "boolean"
+          },
+          "schedule": {
+            "description": "Schedule object: {kind:'cron',expr,tz?} recurring | {kind:'at',at} one-time | {kind:'every',every_ms} recurring interval",
+            "type": "object"
+          },
+          "session_target": {
+            "enum": [
+              "isolated",
+              "main"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "schedule"
+        ],
+        "type": "object"
+      },
+      "mcpToolName": "cron_add",
+      "name": "Edge: cron_add",
+      "registryId": "edge_dtbclaw_cron_add"
+    },
+    {
+      "description": "List all scheduled cron jobs",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "type": "object"
+      },
+      "mcpToolName": "cron_list",
+      "name": "Edge: cron_list",
+      "registryId": "edge_dtbclaw_cron_list"
+    },
+    {
+      "description": "Remove a cron job by id",
+      "inputSchema": {
+        "properties": {
+          "job_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "job_id"
+        ],
+        "type": "object"
+      },
+      "mcpToolName": "cron_remove",
+      "name": "Edge: cron_remove",
+      "registryId": "edge_dtbclaw_cron_remove"
+    },
+    {
+      "description": "Force-run a cron job immediately and record run history",
+      "inputSchema": {
+        "properties": {
+          "approved": {
+            "default": false,
+            "description": "Set true to explicitly approve medium/high-risk shell commands in supervised mode",
+            "type": "boolean"
+          },
+          "job_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "job_id"
+        ],
+        "type": "object"
+      },
+      "mcpToolName": "cron_run",
+      "name": "Edge: cron_run",
+      "registryId": "edge_dtbclaw_cron_run"
+    },
+    {
+      "description": "List recent run history for a cron job",
+      "inputSchema": {
+        "properties": {
+          "job_id": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "job_id"
+        ],
+        "type": "object"
+      },
+      "mcpToolName": "cron_runs",
+      "name": "Edge: cron_runs",
+      "registryId": "edge_dtbclaw_cron_runs"
+    },
+    {
+      "description": "Patch an existing cron job (schedule, command, prompt, enabled, delivery, model, etc.)",
+      "inputSchema": {
+        "properties": {
+          "approved": {
+            "default": false,
+            "description": "Set true to explicitly approve medium/high-risk shell commands in supervised mode",
+            "type": "boolean"
+          },
+          "job_id": {
+            "type": "string"
+          },
+          "patch": {
+            "type": "object"
+          }
+        },
+        "required": [
+          "job_id",
+          "patch"
+        ],
+        "type": "object"
+      },
+      "mcpToolName": "cron_update",
+      "name": "Edge: cron_update",
+      "registryId": "edge_dtbclaw_cron_update"
+    },
+    {
+      "description": "Control Cursor via its CLI. Key operation: 'agent' runs Cursor Agent headlessly in terminal (no IDE needed) — it reads, writes, and runs shell commands on the workspace autonomously. Other operations: open, goto, diff, prompt, install_extension, uninstall_extension, list_extensions, new_window, status, help. Requires the `cursor` command on PATH. Call with {\"operation\":\"help\"} for full usage.",
+      "inputSchema": {
+        "properties": {
+          "column": {
+            "description": "Column number (for 'goto', default: 1)",
+            "type": "integer"
+          },
+          "extension_id": {
+            "description": "Extension marketplace ID, e.g. 'ms-python.python' (for install/uninstall)",
+            "type": "string"
+          },
+          "file": {
+            "description": "File path (for 'goto')",
+            "type": "string"
+          },
+          "file1": {
+            "description": "First file path (for 'diff')",
+            "type": "string"
+          },
+          "file2": {
+            "description": "Second file path (for 'diff')",
+            "type": "string"
+          },
+          "force": {
+            "description": "Auto-approve all agent actions without prompting (for 'agent', default: true)",
+            "type": "boolean"
+          },
+          "headless": {
+            "description": "Run agent in headless mode (--print, no terminal window). Default: false (opens a visible terminal)",
+            "type": "boolean"
+          },
+          "line": {
+            "description": "Line number (for 'goto', default: 1)",
+            "type": "integer"
+          },
+          "message": {
+            "description": "Prompt or instruction text to send to Cursor AI (for 'prompt')",
+            "type": "string"
+          },
+          "mode": {
+            "description": "How to use the prompt in Cursor (for 'prompt'): 'composer' = Cmd+I multi-file edits, 'chat' = Cmd+L ask questions, 'edit' = Cmd+K inline code edits, 'rules' = save as project rule. Default: 'composer'",
+            "enum": [
+              "composer",
+              "chat",
+              "edit",
+              "rules"
+            ],
+            "type": "string"
+          },
+          "model": {
+            "description": "AI model to use (for 'agent'), e.g. 'gpt-5', 'sonnet-4', 'sonnet-4-thinking'",
+            "type": "string"
+          },
+          "operation": {
+            "description": "Cursor CLI operation. 'agent' starts Cursor Agent in a terminal. 'agent_status' polls agent progress and reads output. Use 'help' for full guide.",
+            "enum": [
+              "open",
+              "goto",
+              "diff",
+              "prompt",
+              "agent",
+              "agent_status",
+              "install_extension",
+              "uninstall_extension",
+              "list_extensions",
+              "new_window",
+              "status",
+              "help"
+            ],
+            "type": "string"
+          },
+          "output_format": {
+            "description": "Output format for agent responses (for 'agent', default: 'text')",
+            "enum": [
+              "text",
+              "json",
+              "stream-json"
+            ],
+            "type": "string"
+          },
+          "path": {
+            "description": "File or folder path (for 'open' and 'new_window')",
+            "type": "string"
+          },
+          "reuse_window": {
+            "description": "Reuse existing window instead of opening a new one (for 'open', default: true)",
+            "type": "boolean"
+          },
+          "tail": {
+            "description": "Number of output lines to return (for 'agent_status', default: 50)",
+            "type": "integer"
+          },
+          "wait": {
+            "description": "Wait for the file to be closed before returning (for 'open', default: false)",
+            "type": "boolean"
+          },
+          "workspace": {
+            "description": "Workspace directory for agent to operate on (for 'agent'/'agent_status', defaults to current workspace)",
+            "type": "string"
+          }
+        },
+        "required": [
+          "operation"
+        ],
+        "type": "object"
+      },
+      "mcpToolName": "cursor_cli",
+      "name": "Edge: cursor_cli",
+      "registryId": "edge_dtbclaw_cursor_cli"
+    },
+    {
+      "description": "Extract plain text from a DOCX (Word) file in the workspace. Returns all readable text content. No formatting, images, or charts.",
+      "inputSchema": {
+        "properties": {
+          "max_chars": {
+            "description": "Maximum characters to return (default: 50000, max: 200000)",
+            "maximum": 200000,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "path": {
+            "description": "Path to the DOCX file. Relative paths resolve from workspace.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "type": "object"
+      },
+      "mcpToolName": "docx_read",
+      "name": "Edge: docx_read",
+      "registryId": "edge_dtbclaw_docx_read"
+    },
+    {
+      "description": "Estimate quota cost (tokens, requests) for an operation before executing it. Useful for warning user if operation may exhaust quota or when planning parallel tool calls.",
+      "inputSchema": {
+        "properties": {
+          "estimated_tokens": {
+            "description": "Estimated input+output tokens (optional, default: 1000)",
+            "type": "integer"
+          },
+          "operation": {
+            "description": "Operation type",
+            "enum": [
+              "tool_call",
+              "chat_response",
+              "parallel_tools",
+              "file_analysis"
+            ],
+            "type": "string"
+          },
+          "parallel_count": {
+            "description": "Number of parallel operations (if applicable, default: 1)",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "operation"
+        ],
+        "type": "object"
+      },
+      "mcpToolName": "estimate_quota_cost",
+      "name": "Edge: estimate_quota_cost",
+      "registryId": "edge_dtbclaw_estimate_quota_cost"
+    },
+    {
+      "description": "Edit a file by replacing text in a file. Exact matching is preferred; if exact matching fails, whitespace-flexible line matching is used. Sensitive files (for example .env and key material) are blocked by default.",
+      "inputSchema": {
+        "properties": {
+          "new_string": {
+            "description": "The replacement text (empty string to delete the matched text)",
+            "type": "string"
+          },
+          "old_string": {
+            "description": "The text to find and replace. Exact matching is attempted first; if no exact match is found, whitespace-flexible line matching is attempted.",
+            "type": "string"
+          },
+          "path": {
+            "description": "Path to the file. Relative paths resolve from workspace; outside paths require policy allowlist.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "old_string",
+          "new_string"
+        ],
+        "type": "object"
+      },
+      "mcpToolName": "file_edit",
+      "name": "Edge: file_edit",
+      "registryId": "edge_dtbclaw_file_edit"
+    },
+    {
+      "description": "Read file contents with line numbers. Supports partial reading via offset and limit. Extracts text from PDF; other binary files are read with lossy UTF-8 conversion. Sensitive files (for example .env and key material) are blocked by default.",
+      "inputSchema": {
+        "properties": {
+          "limit": {
+            "description": "Maximum number of lines to return (default: all)",
+            "type": "integer"
+          },
+          "offset": {
+            "description": "Starting line number (1-based, default: 1)",
+            "type": "integer"
+          },
+          "path": {
+            "description": "Path to the file. Relative paths resolve from workspace; outside paths require policy allowlist.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "type": "object"
+      },
+      "mcpToolName": "file_read",
+      "name": "Edge: file_read",
+      "registryId": "edge_dtbclaw_file_read"
+    },
+    {
+      "description": "Write contents to a file in the workspace. Sensitive files (for example .env and key material) are blocked by default.",
+      "inputSchema": {
+        "properties": {
+          "content": {
+            "description": "Content to write to the file",
+            "type": "string"
+          },
+          "path": {
+            "description": "Path to the file. Relative paths resolve from workspace; outside paths require policy allowlist.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "content"
+        ],
+        "type": "object"
+      },
+      "mcpToolName": "file_write",
+      "name": "Edge: file_write",
+      "registryId": "edge_dtbclaw_file_write"
+    },
+    {
+      "description": "Perform structured Git operations (status, diff, log, branch, commit, add, checkout, stash). Provides parsed JSON output and integrates with security policy for autonomy controls.",
+      "inputSchema": {
+        "properties": {
+          "action": {
+            "description": "Stash action (for 'stash' operation)",
+            "enum": [
+              "push",
+              "pop",
+              "list",
+              "drop"
+            ],
+            "type": "string"
+          },
+          "branch": {
+            "description": "Branch name (for 'checkout' operation)",
+            "type": "string"
+          },
+          "cached": {
+            "description": "Show staged changes (for 'diff' operation)",
+            "type": "boolean"
+          },
+          "files": {
+            "description": "File or path to diff (for 'diff' operation, default: '.')",
+            "type": "string"
+          },
+          "index": {
+            "description": "Stash index (for 'stash' with 'drop' action)",
+            "type": "integer"
+          },
+          "limit": {
+            "description": "Number of log entries (for 'log' operation, default: 10)",
+            "type": "integer"
+          },
+          "message": {
+            "description": "Commit message (for 'commit' operation)",
+            "type": "string"
+          },
+          "operation": {
+            "description": "Git operation to perform",
+            "enum": [
+              "status",
+              "diff",
+              "log",
+              "branch",
+              "commit",
+              "add",
+              "checkout",
+              "stash"
+            ],
+            "type": "string"
+          },
+          "paths": {
+            "description": "File paths to stage (for 'add' operation)",
+            "type": "string"
+          }
+        },
+        "required": [
+          "operation"
+        ],
+        "type": "object"
+      },
+      "mcpToolName": "git_operations",
+      "name": "Edge: git_operations",
+      "registryId": "edge_dtbclaw_git_operations"
+    },
+    {
+      "description": "Search for files matching a glob pattern within the workspace. Returns a sorted list of matching file paths relative to the workspace root. Examples: '**/*.rs' (all Rust files), 'src/**/mod.rs' (all mod.rs in src).",
+      "inputSchema": {
+        "properties": {
+          "pattern": {
+            "description": "Glob pattern to match files, e.g. '**/*.rs', 'src/**/mod.rs'",
+            "type": "string"
+          }
+        },
+        "required": [
+          "pattern"
+        ],
+        "type": "object"
+      },
+      "mcpToolName": "glob_search",
+      "name": "Edge: glob_search",
+      "registryId": "edge_dtbclaw_glob_search"
+    },
+    {
+      "description": "Make HTTP requests to external APIs. Supports GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS methods. Security constraints: allowlist-only domains, no local/private hosts, configurable timeout/response size limits, and optional env-backed credential profiles.",
+      "inputSchema": {
+        "properties": {
+          "body": {
+            "description": "Optional request body (for POST, PUT, PATCH requests)",
+            "type": "string"
+          },
+          "credential_profile": {
+            "description": "Optional profile name from [http_request.credential_profiles]. Lets the harness inject credentials from environment variables without passing raw tokens in tool arguments.",
+            "type": "string"
+          },
+          "headers": {
+            "default": {},
+            "description": "Optional HTTP headers as key-value pairs (e.g., {\"Authorization\": \"Bearer token\", \"Content-Type\": \"application/json\"})",
+            "type": "object"
+          },
+          "method": {
+            "default": "GET",
+            "description": "HTTP method (GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS)",
+            "type": "string"
+          },
+          "url": {
+            "description": "HTTP or HTTPS URL to request",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "type": "object"
+      },
+      "mcpToolName": "http_request",
+      "name": "Edge: http_request",
+      "registryId": "edge_dtbclaw_http_request"
+    },
+    {
+      "description": "Read image file metadata (format, dimensions, size) and optionally return base64-encoded data.",
+      "inputSchema": {
+        "properties": {
+          "include_base64": {
+            "description": "Include base64-encoded image data in output (default: false)",
+            "type": "boolean"
+          },
+          "path": {
+            "description": "Path to the image file (absolute or relative to workspace)",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "type": "object"
+      },
+      "mcpToolName": "image_info",
+      "name": "Edge: image_info",
+      "registryId": "edge_dtbclaw_image_info"
+    },
+    {
+      "description": "Manage auth profiles: list all profiles with token status, switch active profile for a provider, or refresh expired OAuth tokens. Use when user asks about accounts, tokens, or when you encounter expired/rate-limited credentials.",
+      "inputSchema": {
+        "properties": {
+          "action": {
+            "description": "Action to perform: 'list' shows all profiles, 'switch' changes active profile, 'refresh' renews OAuth tokens",
+            "enum": [
+              "list",
+              "switch",
+              "refresh"
+            ],
+            "type": "string"
+          },
+          "profile": {
+            "description": "Profile name to switch to (for 'switch' action). E.g., 'default', 'work', 'personal'.",
+            "type": "string"
+          },
+          "provider": {
+            "description": "Provider name (e.g., 'gemini', 'openai-codex', 'anthropic'). Required for switch and refresh.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "action"
+        ],
+        "type": "object"
+      },
+      "mcpToolName": "manage_auth_profile",
+      "name": "Edge: manage_auth_profile",
+      "registryId": "edge_dtbclaw_manage_auth_profile"
+    },
+    {
+      "description": "Remove a memory by key. Use to delete outdated facts or sensitive data. Returns whether the memory was found and removed.",
+      "inputSchema": {
+        "properties": {
+          "key": {
+            "description": "The key of the memory to forget",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key"
+        ],
+        "type": "object"
+      },
+      "mcpToolName": "memory_forget",
+      "name": "Edge: memory_forget",
+      "registryId": "edge_dtbclaw_memory_forget"
+    },
+    {
+      "description": "Store an observation entry in observation memory for long-horizon context continuity.",
+      "inputSchema": {
+        "properties": {
+          "category": {
+            "description": "Optional category override. Defaults to 'observation'.",
+            "type": "string"
+          },
+          "confidence": {
+            "description": "Optional confidence score in [0.0, 1.0].",
+            "type": "number"
+          },
+          "key": {
+            "description": "Optional custom key. Auto-generated when omitted.",
+            "type": "string"
+          },
+          "observation": {
+            "description": "Observation to capture (fact, pattern, or running context signal)",
+            "type": "string"
+          },
+          "source": {
+            "description": "Optional source label for traceability (e.g. 'chat', 'tool_result').",
+            "type": "string"
+          }
+        },
+        "required": [
+          "observation"
+        ],
+        "type": "object"
+      },
+      "mcpToolName": "memory_observe",
+      "name": "Edge: memory_observe",
+      "registryId": "edge_dtbclaw_memory_observe"
+    },
+    {
+      "description": "Search long-term memory for relevant facts, preferences, or context. Returns scored results ranked by relevance.",
+      "inputSchema": {
+        "properties": {
+          "limit": {
+            "description": "Max results to return (default: 5)",
+            "type": "integer"
+          },
+          "query": {
+            "description": "Keywords or phrase to search for in memory",
+            "type": "string"
+          }
+        },
+        "required": [
+          "query"
+        ],
+        "type": "object"
+      },
+      "mcpToolName": "memory_recall",
+      "name": "Edge: memory_recall",
+      "registryId": "edge_dtbclaw_memory_recall"
+    },
+    {
+      "description": "Store a fact, preference, or note in long-term memory. Use category 'core' for permanent facts, 'daily' for session notes, 'conversation' for chat context, or a custom category name.",
+      "inputSchema": {
+        "properties": {
+          "category": {
+            "description": "Memory category: 'core' (permanent), 'daily' (session), 'conversation' (chat), or a custom category name. Defaults to 'core'.",
+            "type": "string"
+          },
+          "content": {
+            "description": "The information to remember",
+            "type": "string"
+          },
+          "key": {
+            "description": "Unique key for this memory (e.g. 'user_lang', 'project_stack')",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "content"
+        ],
+        "type": "object"
+      },
+      "mcpToolName": "memory_store",
+      "name": "Edge: memory_store",
+      "registryId": "edge_dtbclaw_memory_store"
+    },
+    {
+      "description": "Manage default model settings, scenario routes, classification rules, delegate profiles, and agent team/subagent orchestration controls. Designed for natural-language runtime reconfiguration (enable/disable, strategy, and capacity tuning).",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "default": "get",
+            "enum": [
+              "get",
+              "list_hints",
+              "set_default",
+              "set_orchestration",
+              "upsert_scenario",
+              "remove_scenario",
+              "upsert_agent",
+              "remove_agent"
+            ],
+            "type": "string"
+          },
+          "agentic": {
+            "description": "Enable tool-call loop mode for delegate agent",
+            "type": "boolean"
+          },
+          "allowed_tools": {
+            "description": "Allowed tools for agentic delegate mode (string or string array)",
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            ]
+          },
+          "api_key": {
+            "description": "Optional API key override for scenario route or delegate agent",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "capabilities": {
+            "description": "Capability tags for automatic agent selection (string or string array)",
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            ]
+          },
+          "classification_enabled": {
+            "description": "When true, upsert classification rule for this hint; false removes it",
+            "type": "boolean"
+          },
+          "enabled": {
+            "description": "Enable or disable a delegate profile for selection/invocation",
+            "type": "boolean"
+          },
+          "hint": {
+            "description": "Scenario hint name (for example: conversation, coding, reasoning)",
+            "type": "string"
+          },
+          "keywords": {
+            "description": "Classification keywords for upsert_scenario (string or string array)",
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            ]
+          },
+          "max_concurrent_subagents": {
+            "description": "Maximum number of concurrently running background sub-agents (positive integer, no hard-coded upper cap)",
+            "minimum": 1,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "max_depth": {
+            "description": "Delegate max recursion depth",
+            "minimum": 1,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "max_iterations": {
+            "description": "Maximum tool-call iterations for agentic delegate mode",
+            "minimum": 1,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "max_length": {
+            "description": "Optional maximum message length matcher",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "max_team_agents": {
+            "description": "Maximum number of delegate profiles activated for teams (positive integer, no hard-coded upper cap)",
+            "minimum": 1,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "min_length": {
+            "description": "Optional minimum message length matcher",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "model": {
+            "description": "Model for set_default/upsert_scenario/upsert_agent",
+            "type": "string"
+          },
+          "name": {
+            "description": "Delegate sub-agent name for upsert_agent/remove_agent",
+            "type": "string"
+          },
+          "patterns": {
+            "description": "Classification literal patterns for upsert_scenario (string or string array)",
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            ]
+          },
+          "priority": {
+            "description": "Priority value. For scenarios: classifier order (higher runs first). For upsert_agent: delegate selection priority.",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "provider": {
+            "description": "Provider for set_default/upsert_scenario/upsert_agent",
+            "type": "string"
+          },
+          "remove_classification": {
+            "description": "When remove_scenario, whether to remove matching classification rule (default true)",
+            "type": "boolean"
+          },
+          "subagents_auto_activate": {
+            "description": "Enable/disable automatic sub-agent selection when agent is omitted or 'auto'",
+            "type": "boolean"
+          },
+          "subagents_enabled": {
+            "description": "Enable/disable background sub-agent tools",
+            "type": "boolean"
+          },
+          "subagents_inflight_penalty": {
+            "description": "Sub-agent score penalty per in-flight task",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "subagents_load_window_secs": {
+            "description": "Recent-event window for sub-agent load balancing (seconds)",
+            "minimum": 1,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "subagents_queue_poll_ms": {
+            "description": "Poll interval while waiting for sub-agent capacity (milliseconds)",
+            "minimum": 1,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "subagents_queue_wait_ms": {
+            "description": "How long to wait for sub-agent capacity before failing (milliseconds)",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "subagents_recent_failure_penalty": {
+            "description": "Sub-agent score penalty per recent failure in the load window",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "subagents_recent_selection_penalty": {
+            "description": "Sub-agent score penalty per recent assignment in the load window",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "subagents_strategy": {
+            "description": "Sub-agent auto-selection strategy",
+            "enum": [
+              "semantic",
+              "adaptive",
+              "least_loaded",
+              null
+            ],
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "system_prompt": {
+            "description": "Optional system prompt override for delegate agent",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "teams_auto_activate": {
+            "description": "Enable/disable automatic team-agent selection when agent is omitted or 'auto'",
+            "type": "boolean"
+          },
+          "teams_enabled": {
+            "description": "Enable/disable synchronous agent-team delegation tools",
+            "type": "boolean"
+          },
+          "teams_inflight_penalty": {
+            "description": "Team score penalty per in-flight task",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "teams_load_window_secs": {
+            "description": "Recent-event window for team load balancing (seconds)",
+            "minimum": 1,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "teams_recent_failure_penalty": {
+            "description": "Team score penalty per recent failure in the load window",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "teams_recent_selection_penalty": {
+            "description": "Team score penalty per recent assignment in the load window",
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "teams_strategy": {
+            "description": "Team auto-selection strategy",
+            "enum": [
+              "semantic",
+              "adaptive",
+              "least_loaded",
+              null
+            ],
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "temperature": {
+            "description": "Optional temperature override (0.0-2.0)",
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "transport": {
+            "description": "Optional route transport override for upsert_scenario (auto, websocket, sse)",
+            "enum": [
+              "auto",
+              "websocket",
+              "sse",
+              "ws",
+              "http",
+              null
+            ],
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "mcpToolName": "model_routing_config",
+      "name": "Edge: model_routing_config",
+      "registryId": "edge_dtbclaw_model_routing_config"
+    },
+    {
+      "description": "Preview or execute merge-first migration from OpenClaw (memory + config + agents) without overwriting existing OctoClaw data.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "description": "preview runs a dry-run report; migrate applies merge changes",
+            "enum": [
+              "preview",
+              "migrate"
+            ],
+            "type": "string"
+          },
+          "include_config": {
+            "description": "Whether to migrate provider/channels/agents config (default true)",
+            "type": "boolean"
+          },
+          "include_memory": {
+            "description": "Whether to migrate memory entries (default true)",
+            "type": "boolean"
+          },
+          "source_config": {
+            "description": "Optional OpenClaw config path (default ~/.openclaw/openclaw.json)",
+            "type": "string"
+          },
+          "source_workspace": {
+            "description": "Optional OpenClaw workspace path (default ~/.openclaw/workspace)",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "mcpToolName": "openclaw_migration",
+      "name": "Edge: openclaw_migration",
+      "registryId": "edge_dtbclaw_openclaw_migration"
+    },
+    {
+      "description": "Extract plain text from a PDF file in the workspace. Returns all readable text. Image-only or encrypted PDFs return an empty result. Requires the 'rag-pdf' build feature.",
+      "inputSchema": {
+        "properties": {
+          "max_chars": {
+            "description": "Maximum characters to return (default: 50000, max: 200000)",
+            "maximum": 200000,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "path": {
+            "description": "Path to the PDF file. Relative paths resolve from workspace; outside paths require policy allowlist.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "type": "object"
+      },
+      "mcpToolName": "pdf_read",
+      "name": "Edge: pdf_read",
+      "registryId": "edge_dtbclaw_pdf_read"
+    },
+    {
+      "description": "Extract plain text from a PPTX (PowerPoint) file in the workspace. Returns all readable text content from all slides. No formatting, images, or charts.",
+      "inputSchema": {
+        "properties": {
+          "max_chars": {
+            "description": "Maximum characters to return (default: 50000, max: 200000)",
+            "maximum": 200000,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "path": {
+            "description": "Path to the PPTX file. Relative paths resolve from workspace.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "type": "object"
+      },
+      "mcpToolName": "pptx_read",
+      "name": "Edge: pptx_read",
+      "registryId": "edge_dtbclaw_pptx_read"
+    },
+    {
+      "description": "Manage background processes: spawn long-running commands, check output, and terminate them",
+      "inputSchema": {
+        "properties": {
+          "action": {
+            "description": "Action to perform: spawn a process, list all, get output, or kill",
+            "enum": [
+              "spawn",
+              "list",
+              "output",
+              "kill"
+            ],
+            "type": "string"
+          },
+          "approved": {
+            "default": false,
+            "description": "Approve medium/high-risk commands (for 'spawn')",
+            "type": "boolean"
+          },
+          "command": {
+            "description": "Shell command to run in background (required for 'spawn')",
+            "type": "string"
+          },
+          "id": {
+            "description": "Process ID returned by spawn (required for 'output' and 'kill')",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "action"
+        ],
+        "type": "object"
+      },
+      "mcpToolName": "process",
+      "name": "Edge: process",
+      "registryId": "edge_dtbclaw_process"
+    },
+    {
+      "description": "Manage OctoClaw proxy settings (scope: environment | octoclaw | services), including runtime and process env application",
+      "inputSchema": {
+        "properties": {
+          "action": {
+            "default": "get",
+            "enum": [
+              "get",
+              "set",
+              "disable",
+              "list_services",
+              "apply_env",
+              "clear_env"
+            ],
+            "type": "string"
+          },
+          "all_proxy": {
+            "description": "Fallback proxy URL for all protocols",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "clear_env": {
+            "description": "When action=disable, clear process proxy environment variables",
+            "type": "boolean"
+          },
+          "enabled": {
+            "description": "Enable or disable proxy",
+            "type": "boolean"
+          },
+          "http_proxy": {
+            "description": "HTTP proxy URL",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "https_proxy": {
+            "description": "HTTPS proxy URL",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "no_proxy": {
+            "description": "Comma-separated string or array of NO_PROXY entries",
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            ]
+          },
+          "scope": {
+            "description": "Proxy scope: environment | octoclaw | services",
+            "type": "string"
+          },
+          "services": {
+            "description": "Comma-separated string or array of service selectors used when scope=services",
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            ]
+          }
+        },
+        "type": "object"
+      },
+      "mcpToolName": "proxy_config",
+      "name": "Edge: proxy_config",
+      "registryId": "edge_dtbclaw_proxy_config"
+    },
+    {
+      "description": "Send a Pushover notification to your device. Uses PUSHOVER_TOKEN/PUSHOVER_USER_KEY from process environment first, then falls back to .env.",
+      "inputSchema": {
+        "properties": {
+          "message": {
+            "description": "The notification message to send",
+            "type": "string"
+          },
+          "priority": {
+            "description": "Message priority: -2 (lowest/silent), -1 (low/no sound), 0 (normal), 1 (high), 2 (emergency/repeating)",
+            "type": "integer"
+          },
+          "sound": {
+            "description": "Notification sound override (e.g., 'pushover', 'bike', 'bugle', 'cashregister', etc.)",
+            "type": "string"
+          },
+          "title": {
+            "description": "Optional notification title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "message"
+        ],
+        "type": "object"
+      },
+      "mcpToolName": "pushover",
+      "name": "Edge: pushover",
+      "registryId": "edge_dtbclaw_pushover"
+    },
+    {
+      "description": "Manage scheduled shell-only tasks. Actions: create/add/once/list/get/cancel/remove/pause/resume. WARNING: This tool creates shell jobs whose output is only logged, NOT delivered to any channel. To send a scheduled message to Discord/Telegram/Slack/Mattermost/QQ/Lark/Feishu/Email, use the cron_add tool with job_type='agent' and a delivery config like {\"mode\":\"announce\",\"channel\":\"discord\",\"to\":\"<channel_id>\"}.",
+      "inputSchema": {
+        "properties": {
+          "action": {
+            "description": "Action to perform",
+            "enum": [
+              "create",
+              "add",
+              "once",
+              "list",
+              "get",
+              "cancel",
+              "remove",
+              "pause",
+              "resume"
+            ],
+            "type": "string"
+          },
+          "approved": {
+            "default": false,
+            "description": "Set true to explicitly approve medium/high-risk shell commands in supervised mode",
+            "type": "boolean"
+          },
+          "command": {
+            "description": "Shell command to execute. Required for create/add/once.",
+            "type": "string"
+          },
+          "delay": {
+            "description": "Delay for one-shot tasks (e.g. '30m', '2h', '1d').",
+            "type": "string"
+          },
+          "expression": {
+            "description": "Cron expression for recurring tasks (e.g. '*/5 * * * *').",
+            "type": "string"
+          },
+          "id": {
+            "description": "Task ID. Required for get/cancel/remove/pause/resume.",
+            "type": "string"
+          },
+          "run_at": {
+            "description": "Absolute RFC3339 time for one-shot tasks (e.g. '2030-01-01T00:00:00Z').",
+            "type": "string"
+          }
+        },
+        "required": [
+          "action"
+        ],
+        "type": "object"
+      },
+      "mcpToolName": "schedule",
+      "name": "Edge: schedule",
+      "registryId": "edge_dtbclaw_schedule"
+    },
+    {
+      "description": "Capture a screenshot of the current screen. Returns the file path and base64-encoded PNG data.",
+      "inputSchema": {
+        "properties": {
+          "filename": {
+            "description": "Optional filename (default: screenshot_<timestamp>.png). Saved in workspace.",
+            "type": "string"
+          },
+          "region": {
+            "description": "Optional region for macOS: 'selection' for interactive crop, 'window' for front window. Ignored on Linux.",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "mcpToolName": "screenshot",
+      "name": "Edge: screenshot",
+      "registryId": "edge_dtbclaw_screenshot"
+    },
+    {
+      "description": "Execute a shell command in the workspace directory",
+      "inputSchema": {
+        "properties": {
+          "approved": {
+            "default": false,
+            "description": "Set true to explicitly approve medium/high-risk commands in supervised mode",
+            "type": "boolean"
+          },
+          "command": {
+            "description": "The shell command to execute",
+            "type": "string"
+          }
+        },
+        "required": [
+          "command"
+        ],
+        "type": "object"
+      },
+      "mcpToolName": "shell",
+      "name": "Edge: shell",
+      "registryId": "edge_dtbclaw_shell"
+    },
+    {
+      "description": "Switch to a different AI provider/model by updating config.toml. Use when current provider is rate-limited or when user explicitly requests a specific provider for a task. The change persists across requests.",
+      "inputSchema": {
+        "properties": {
+          "model": {
+            "description": "Specific model (optional, e.g., 'gemini-2.5-flash', 'claude-opus-4')",
+            "type": "string"
+          },
+          "provider": {
+            "description": "Provider name (e.g., 'gemini', 'openai', 'anthropic')",
+            "type": "string"
+          },
+          "reason": {
+            "description": "Reason for switching (for logging and user notification)",
+            "type": "string"
+          }
+        },
+        "required": [
+          "provider"
+        ],
+        "type": "object"
+      },
+      "mcpToolName": "switch_provider",
+      "name": "Edge: switch_provider",
+      "registryId": "edge_dtbclaw_switch_provider"
+    },
+    {
+      "description": "Manage a task checklist for the current session. Use to break complex work into steps and track progress.\nActions: create (batch), add (single), update (change status), list (view all), delete (clear all).",
+      "inputSchema": {
+        "properties": {
+          "action": {
+            "description": "Operation to perform",
+            "enum": [
+              "create",
+              "add",
+              "update",
+              "list",
+              "delete"
+            ],
+            "type": "string"
+          },
+          "id": {
+            "description": "For 'update': ID of the task to update",
+            "type": "integer"
+          },
+          "status": {
+            "description": "For 'update': new status",
+            "enum": [
+              "pending",
+              "in_progress",
+              "completed"
+            ],
+            "type": "string"
+          },
+          "tasks": {
+            "description": "For 'create': list of tasks to create (replaces existing list)",
+            "items": {
+              "properties": {
+                "status": {
+                  "enum": [
+                    "pending",
+                    "in_progress",
+                    "completed"
+                  ],
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "title"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "title": {
+            "description": "For 'add': title of the new task",
+            "type": "string"
+          }
+        },
+        "required": [
+          "action"
+        ],
+        "type": "object"
+      },
+      "mcpToolName": "task_plan",
+      "name": "Edge: task_plan",
+      "registryId": "edge_dtbclaw_task_plan"
+    },
+    {
+      "description": "Inspect and update shared network URL access policy ([security.url_access]) including first-visit approval, global allowlist/blocklist, and approved domains.",
+      "inputSchema": {
+        "properties": {
+          "action": {
+            "description": "Operation to perform",
+            "enum": [
+              "get",
+              "set",
+              "check_url"
+            ],
+            "type": "string"
+          },
+          "add_approved_domains": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            ]
+          },
+          "add_domain_allowlist": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            ]
+          },
+          "add_domain_blocklist": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            ]
+          },
+          "allow_cidrs": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            ]
+          },
+          "allow_domains": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            ]
+          },
+          "allow_loopback": {
+            "type": "boolean"
+          },
+          "approved_domains": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            ]
+          },
+          "block_private_ip": {
+            "type": "boolean"
+          },
+          "domain_allowlist": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            ]
+          },
+          "domain_blocklist": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            ]
+          },
+          "enforce_domain_allowlist": {
+            "type": "boolean"
+          },
+          "remove_approved_domains": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            ]
+          },
+          "remove_domain_allowlist": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            ]
+          },
+          "remove_domain_blocklist": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            ]
+          },
+          "require_first_visit_approval": {
+            "type": "boolean"
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "action"
+        ],
+        "type": "object"
+      },
+      "mcpToolName": "web_access_config",
+      "name": "Edge: web_access_config",
+      "registryId": "edge_dtbclaw_web_access_config"
+    },
+    {
+      "description": "Fetch a web page and return text content for LLM consumption. Strips navigation, scripts, and boilerplate before extraction. Providers: nanohtml2text (default), firecrawl, tavily. Deprecated alias: fast_html2md. Security: allowlist-only domains, blocked_domains, and no local/private hosts.",
+      "inputSchema": {
+        "properties": {
+          "url": {
+            "description": "The HTTP or HTTPS URL to fetch",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "type": "object"
+      },
+      "mcpToolName": "web_fetch",
+      "name": "Edge: web_fetch",
+      "registryId": "edge_dtbclaw_web_fetch"
+    },
+    {
+      "description": "Inspect and update [web_search] configuration at runtime (providers, fallbacks, retries, provider-specific keys/options).",
+      "inputSchema": {
+        "properties": {
+          "action": {
+            "description": "Operation to perform",
+            "enum": [
+              "get",
+              "set",
+              "list_providers"
+            ],
+            "type": "string"
+          },
+          "api_key": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "brave_api_key": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "country": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "domain_filter": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            ]
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "exa_api_key": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "exa_include_text": {
+            "type": "boolean"
+          },
+          "exa_search_type": {
+            "enum": [
+              "auto",
+              "keyword",
+              "neural"
+            ],
+            "type": "string"
+          },
+          "fallback_providers": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            ]
+          },
+          "jina_api_key": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "jina_site_filters": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            ]
+          },
+          "language_filter": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              }
+            ]
+          },
+          "max_results": {
+            "maximum": 10,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "max_tokens": {
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "max_tokens_per_page": {
+            "minimum": 0,
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "perplexity_api_key": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "provider": {
+            "type": "string"
+          },
+          "recency_filter": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "retries_per_provider": {
+            "maximum": 5,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "retry_backoff_ms": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "timeout_secs": {
+            "minimum": 1,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "action"
+        ],
+        "type": "object"
+      },
+      "mcpToolName": "web_search_config",
+      "name": "Edge: web_search_config",
+      "registryId": "edge_dtbclaw_web_search_config"
+    },
+    {
+      "description": "Extract plain text and numeric data from an XLSX (Excel) file in the workspace. Returns tab-separated cell values per row for each sheet. No formulas, charts, styles, or merged-cell awareness.",
+      "inputSchema": {
+        "properties": {
+          "max_chars": {
+            "description": "Maximum characters to return (default: 50000, max: 200000)",
+            "maximum": 200000,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "path": {
+            "description": "Path to the XLSX file. Relative paths resolve from workspace.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "type": "object"
+      },
+      "mcpToolName": "xlsx_read",
+      "name": "Edge: xlsx_read",
+      "registryId": "edge_dtbclaw_xlsx_read"
+    }
+  ]
+}

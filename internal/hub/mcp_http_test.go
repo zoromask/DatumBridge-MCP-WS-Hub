@@ -76,8 +76,18 @@ func TestMCPStreamableHTTP_InitializeAndToolsList(t *testing.T) {
 	if listResp.Error != nil {
 		t.Fatalf("rpc error: %s", listResp.Error.Message)
 	}
-	if len(listResp.Result.Tools) < 2 {
-		t.Fatalf("expected at least 2 tools, got %d", len(listResp.Result.Tools))
+	if len(listResp.Result.Tools) < 10 {
+		t.Fatalf("expected hub builtins + DTBClaw edge catalog (many tools), got %d", len(listResp.Result.Tools))
+	}
+	var sawShell bool
+	for _, tl := range listResp.Result.Tools {
+		if tl.Name == "shell" {
+			sawShell = true
+			break
+		}
+	}
+	if !sawShell {
+		t.Fatal("expected native edge tool shell in tools/list")
 	}
 }
 

@@ -2,6 +2,7 @@ package hub
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -74,7 +75,7 @@ func (h *Hub) handleMCPInitialize(w http.ResponseWriter, id json.RawMessage) {
 			"tools": map[string]interface{}{},
 		},
 		"serverInfo": map[string]string{
-			"name":    "datumbridge-mcp-ws-hub",
+			"name":    "DatumBridge MCP WS Hub",
 			"version": "1.0.0",
 		},
 	}
@@ -93,10 +94,15 @@ func (h *Hub) handleMCPToolsList(w http.ResponseWriter, r *http.Request, id json
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	writeMCPRPCResult(w, id, map[string]interface{}{"tools": mcpToolDescriptors()})
+	tools, err := mcpToolDescriptors()
+	if err != nil {
+		log.Warn().Err(err).Msg("mcp tools/list: edge catalog")
+		tools = mcpBuiltinToolDescriptors()
+	}
+	writeMCPRPCResult(w, id, map[string]interface{}{"tools": tools})
 }
 
-func mcpToolDescriptors() []map[string]interface{} {
+func mcpBuiltinToolDescriptors() []map[string]interface{} {
 	return []map[string]interface{}{
 		{
 			"name":        "hub_info",
@@ -125,6 +131,18 @@ func mcpToolDescriptors() []map[string]interface{} {
 			},
 		},
 	}
+}
+
+func mcpToolDescriptors() ([]map[string]interface{}, error) {
+	built := mcpBuiltinToolDescriptors()
+	extra, err := edgeRelayToolDescriptors()
+	if err != nil {
+		return nil, err
+	}
+	out := make([]map[string]interface{}, 0, len(built)+len(extra))
+	out = append(out, built...)
+	out = append(out, extra...)
+	return out, nil
 }
 
 type mcpCallParams struct {
@@ -156,11 +174,11 @@ func (h *Hub) handleMCPToolsCall(w http.ResponseWriter, r *http.Request, env rpc
 	case "hub_info":
 		infos := h.ListDeviceInfos()
 		summary, _ := json.Marshal(map[string]interface{}{
-			"service":           "datumbridge-mcp-ws-hub",
-			"protocol":          "MCP Streamable HTTP subset for DatumBridge publish/approve",
-			"devices":           infos,
-			"device_count":      len(infos),
-			"connected_count":   countConnected(infos),
+			"service":         "datumbridge-mcp-ws-hub",
+			"protocol":        "MCP Streamable HTTP subset for DatumBridge publish/approve",
+			"devices":         infos,
+			"device_count":    len(infos),
+			"connected_count": countConnected(infos),
 		})
 		writeMCPRPCResult(w, env.ID, mcpToolResultText(string(summary)))
 
@@ -191,7 +209,77 @@ func (h *Hub) handleMCPToolsCall(w http.ResponseWriter, r *http.Request, env rpc
 		writeMCPRPCResult(w, env.ID, mcpToolResultText(string(resp)))
 
 	default:
+		if isEdgeRelayTool(params.Name) {
+			h.handleMCPEdgeRelayTool(w, env, params)
+			return
+		}
 		writeMCPRPCError(w, env.ID, -32601, "unknown tool: "+params.Name)
+	}
+}
+
+func rpcIDToInterface(id json.RawMessage) interface{} {
+	if len(id) == 0 || string(id) == "null" {
+		return nil
+	}
+	var v interface{}
+	if err := json.Unmarshal(id, &v); err != nil {
+		return nil
+	}
+	return v
+}
+
+// handleMCPEdgeRelayTool forwards tools/call to a connected DTBClaw device (native tool name).
+func (h *Hub) handleMCPEdgeRelayTool(w http.ResponseWriter, env rpcEnvelope, params mcpCallParams) {
+	var args map[string]interface{}
+	if err := json.Unmarshal(params.Arguments, &args); err != nil || args == nil {
+		writeMCPRPCError(w, env.ID, -32602, "invalid arguments")
+		return
+	}
+	deviceID := strings.TrimSpace(stringArg(args, "device_id"))
+	if deviceID == "" {
+		deviceID = strings.TrimSpace(stringArg(args, "deviceId"))
+	}
+	if deviceID == "" {
+		writeMCPRPCError(w, env.ID, -32602, "device_id is required")
+		return
+	}
+	delete(args, "device_id")
+	delete(args, "deviceId")
+
+	forward := map[string]interface{}{
+		"jsonrpc": "2.0",
+		"id":      rpcIDToInterface(env.ID),
+		"method":  "tools/call",
+		"params": map[string]interface{}{
+			"name":      params.Name,
+			"arguments": args,
+		},
+	}
+	payload, err := json.Marshal(forward)
+	if err != nil {
+		writeMCPRPCError(w, env.ID, -32603, "failed to build JSON-RPC payload")
+		return
+	}
+	resp, ok := h.ForwardRequest(deviceID, payload, requestTimeout)
+	if !ok {
+		writeMCPRPCResult(w, env.ID, mcpToolResultError("device not connected or request timeout"))
+		return
+	}
+	writeMCPRPCResult(w, env.ID, mcpToolResultText(string(resp)))
+}
+
+func stringArg(m map[string]interface{}, key string) string {
+	v, ok := m[key]
+	if !ok || v == nil {
+		return ""
+	}
+	switch t := v.(type) {
+	case string:
+		return t
+	case json.Number:
+		return t.String()
+	default:
+		return strings.TrimSpace(fmt.Sprint(t))
 	}
 }
 
