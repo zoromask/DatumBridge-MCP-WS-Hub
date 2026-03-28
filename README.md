@@ -52,6 +52,18 @@ curl -X POST http://localhost:8000/api/v1/devices/register \
 
 Pairing codes expire after **`HUB_PAIRING_TTL`** (default `1m`; see Environment Variables).
 
+## Tool Registry (datumbridge-mcp)
+
+DTBClaw edge tool definitions (`internal/hub/dtbclaw_edge_catalog.json`, ~45 tools) ship **only** in this repo. To expose them in the DatumBridge Tool Registry and Studio, set on the hub deployment:
+
+| Variable | Example | Purpose |
+|----------|---------|---------|
+| `TOOL_REGISTRY_BASE_URL` | `http://datumbridge-mcp:8081/api/v1` | Registry API prefix (**must** include `/api/v1`) |
+| `TOOL_REGISTRY_API_KEY` | _(same as MCP_API_KEY)_ | Optional; required when the registry enforces API key auth |
+| `WS_HUB_REGISTRY_MCPSERVER_NAME` | `datumbridge_mcp_ws_hub` | Stored on each tool as `mcpServer` (routing/grouping); override if you use a different logical server id |
+
+On startup the hub POSTs each catalog entry to `POST …/tools` (with retries). Start **datumbridge-mcp** before or soon after the hub so sync succeeds; check hub logs for `tool registry sync completed`.
+
 ## Installation & setup (Kubernetes + DatumBridge Studio + DTBClaw)
 
 Typical layout: **hub** runs in one namespace (e.g. `mcp-tools`), **DatumBridge Studio** in another (e.g. `datumbridge-adk-db`). Edge devices and operators use the **same public Studio URL** as for `/api/mcp` and `/api/adk`, under **`/api/ws-hub`**.

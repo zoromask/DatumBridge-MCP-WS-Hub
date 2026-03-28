@@ -86,6 +86,24 @@ func main() {
 		}
 	}()
 
+	regBase := strings.TrimSpace(os.Getenv("TOOL_REGISTRY_BASE_URL"))
+	if regBase != "" {
+		regKey := strings.TrimSpace(os.Getenv("TOOL_REGISTRY_API_KEY"))
+		mcpName := strings.TrimSpace(os.Getenv("WS_HUB_REGISTRY_MCPSERVER_NAME"))
+		if mcpName == "" {
+			mcpName = hub.DefaultRegistryMcpServerID
+		}
+		go func() {
+			ctx := context.Background()
+			n, err := hub.SyncEdgeCatalogToRegistry(ctx, regBase, regKey, mcpName)
+			if err != nil {
+				log.Error().Err(err).Str("registry", regBase).Msg("tool registry sync failed (catalog from this repo)")
+				return
+			}
+			log.Info().Int("tools_synced", n).Str("registry", regBase).Str("mcpServer", mcpName).Msg("tool registry sync completed")
+		}()
+	}
+
 	<-quit
 	log.Info().Msg("shutting down gracefully…")
 
