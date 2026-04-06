@@ -70,7 +70,11 @@ Typical layout: **hub** runs in one namespace (e.g. `mcp-tools`), **DatumBridge 
 
 ### 1. Deploy the hub
 
-1. Apply your hub `Deployment` and `Service` (container listens on **`8000`** by default unless `HUB_PORT` is set).
+**Production (DatumBridge):** **`datumbridge-deploy-service`** builds and rolls out this service by **pulling the `datumbridge-mcp-ws-hub` source tree from GitLab or GitHub** (the same code as this directory in the monorepo), running **`docker build`** against the repository **`Dockerfile`**, pushing the image to your registry, and creating the Kubernetes **Deployment** and **Service**. See `dtb-agent-kit/datumbridge-deploy-service/DEPLOY.md` for `POST /api/v1/deploy` fields (`repository_url`, `dockerfile_path`, `server_port`, etc.). Set hub env vars (for example **`HUB_EXPECTED_EDGE_VERSION`**, **`HUB_REGISTER_API_KEY`**) on the Deployment the deploy service creates or via your follow-up manifest patch.
+
+**Manual / dev:** apply your own `Deployment` and `Service`, or run locally:
+
+1. Container listens on **`8000`** by default unless `HUB_PORT` is set.
 2. Note the **Kubernetes Service name** and **namespace** (Helm often suffixes the name, e.g. `datumbridge-mcp-ws-hub-main` in `mcp-tools`).
 3. Confirm endpoints: `kubectl -n <hub-ns> get svc,endpoints <hub-service-name>`.
 

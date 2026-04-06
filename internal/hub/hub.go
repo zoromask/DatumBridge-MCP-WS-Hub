@@ -8,6 +8,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
 
@@ -17,6 +18,13 @@ type Conn struct {
 	Send        chan []byte
 	ConnectedIP string
 	ConnectedAt time.Time
+
+	edgeMu      sync.RWMutex
+	EdgeVersion string
+	EdgeGitSHA  string
+	EdgeProto   int
+	DriftStatus string    // unknown | ok | warn
+	HelloAt     time.Time // UTC when last edge hello applied
 }
 
 // DeviceInfo is the combined view of a device (persisted metadata + live connection state).
@@ -29,6 +37,13 @@ type DeviceInfo struct {
 	Connected    bool   `json:"connected"`
 	ConnectedIP  string `json:"connected_ip,omitempty"`
 	ConnectedAt  string `json:"connected_at,omitempty"`
+	// From edge WebSocket hello (when connected); drift vs HUB_EXPECTED_EDGE_VERSION.
+	EdgeVersion      string `json:"edge_version,omitempty"`
+	EdgeGitSHA       string `json:"edge_git_sha,omitempty"`
+	EdgeProtocol     int    `json:"edge_protocol,omitempty"`
+	DriftStatus      string `json:"drift_status,omitempty"`
+	EdgeHelloAt      string `json:"edge_hello_at,omitempty"`
+	HubExpectedEdgeV string `json:"hub_expected_edge_version,omitempty"`
 }
 
 // pendingReq holds a waiting HTTP request for a JSON-RPC response
@@ -162,30 +177,73 @@ func (h *Hub) ListDeviceInfos() []DeviceInfo {
 			info.Connected = true
 			info.ConnectedIP = conn.ConnectedIP
 			info.ConnectedAt = conn.ConnectedAt.Format(time.RFC3339)
+			ver, sha, proto, drift, hello := conn.edgeSnapshot()
+			info.EdgeVersion = ver
+			info.EdgeGitSHA = sha
+			info.EdgeProtocol = proto
+			info.DriftStatus = drift
+			info.HubExpectedEdgeV = expectedEdgeVersion()
+			if !hello.IsZero() {
+				info.EdgeHelloAt = hello.Format(time.RFC3339)
+			}
 		}
 		out = append(out, info)
 	}
 	// Include any connected devices that somehow don't have a persisted record
 	for id, conn := range connsCopy {
 		if !seen[id] {
-			out = append(out, DeviceInfo{
+			di := DeviceInfo{
 				DeviceID:    id,
 				Connected:   true,
 				ConnectedIP: conn.ConnectedIP,
 				ConnectedAt: conn.ConnectedAt.Format(time.RFC3339),
-			})
+			}
+			ver, sha, proto, drift, hello := conn.edgeSnapshot()
+			di.EdgeVersion = ver
+			di.EdgeGitSHA = sha
+			di.EdgeProtocol = proto
+			di.DriftStatus = drift
+			di.HubExpectedEdgeV = expectedEdgeVersion()
+			if !hello.IsZero() {
+				di.EdgeHelloAt = hello.Format(time.RFC3339)
+			}
+			out = append(out, di)
 		}
 	}
 	return out
 }
 
+// ForwardRequestOpts carries optional forward metadata (correlation id for logs).
+type ForwardRequestOpts struct {
+	CorrelationID string
+}
+
+func forwardWarn(opts ForwardRequestOpts, deviceID string) *zerolog.Event {
+	ev := log.Warn()
+	if opts.CorrelationID != "" {
+		ev = ev.Str("correlation_id", opts.CorrelationID)
+	}
+	if deviceID != "" {
+		ev = ev.Str("device_id", deviceID)
+	}
+	return ev
+}
+
 // ForwardRequest sends a JSON-RPC request to the device and waits for the response.
 // Returns the response body or error. Timeout after timeoutDur.
 func (h *Hub) ForwardRequest(deviceID string, payload []byte, timeoutDur time.Duration) ([]byte, bool) {
+	return h.ForwardRequestWithOpts(deviceID, payload, timeoutDur, ForwardRequestOpts{})
+}
+
+// ForwardRequestWithOpts is like ForwardRequest but attaches correlation_id to hub logs when set.
+// When the device outbound buffer is briefly full, retries up to HUB_FORWARD_SEND_RETRIES with
+// HUB_FORWARD_SEND_RETRY_INTERVAL_MS between attempts (not used for offline devices or JSON-RPC timeouts).
+func (h *Hub) ForwardRequestWithOpts(deviceID string, payload []byte, timeoutDur time.Duration, opts ForwardRequestOpts) ([]byte, bool) {
 	var req struct {
 		ID interface{} `json:"id"`
 	}
 	if err := json.Unmarshal(payload, &req); err != nil {
+		forwardWarn(opts, deviceID).Err(err).Msg("forward: invalid JSON-RPC payload")
 		return nil, false
 	}
 	rpcID := idToString(req.ID)
@@ -199,6 +257,7 @@ func (h *Hub) ForwardRequest(deviceID string, payload []byte, timeoutDur time.Du
 	h.pendingMu.Lock()
 	if _, exists := h.pending[key]; exists {
 		h.pendingMu.Unlock()
+		forwardWarn(opts, deviceID).Str("rpc_id", rpcID).Msg("forward: duplicate in-flight request id for device")
 		return nil, false
 	}
 	pr := &pendingReq{
@@ -228,12 +287,11 @@ func (h *Hub) ForwardRequest(deviceID string, payload []byte, timeoutDur time.Du
 			close(p.ch)
 		}
 		h.pendingMu.Unlock()
+		forwardWarn(opts, deviceID).Msg("forward: device not connected")
 		return nil, false
 	}
 
-	select {
-	case c.Send <- payload:
-	default:
+	if !h.forwardTrySend(c, payload, opts) {
 		h.pendingMu.Lock()
 		if p, ok := h.pending[key]; ok {
 			delete(h.pending, key)
@@ -241,11 +299,37 @@ func (h *Hub) ForwardRequest(deviceID string, payload []byte, timeoutDur time.Du
 			close(p.ch)
 		}
 		h.pendingMu.Unlock()
+		forwardWarn(opts, deviceID).Msg("forward: device send buffer full after retries")
 		return nil, false
 	}
 
 	resp, ok := <-ch
+	if !ok {
+		forwardWarn(opts, deviceID).Msg("forward: response channel closed (timeout or disconnect)")
+	}
 	return resp, ok
+}
+
+func (h *Hub) forwardTrySend(c *Conn, payload []byte, opts ForwardRequestOpts) bool {
+	maxAttempts := forwardSendMaxAttempts()
+	delay := forwardSendRetryInterval()
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		select {
+		case c.Send <- payload:
+			if attempt > 1 && opts.CorrelationID != "" {
+				log.Debug().Str("correlation_id", opts.CorrelationID).Str("device_id", c.DeviceID).Int("attempt", attempt).Msg("forward: send succeeded after retry")
+			}
+			return true
+		default:
+			if attempt == maxAttempts {
+				return false
+			}
+			if delay > 0 {
+				time.Sleep(delay)
+			}
+		}
+	}
+	return false
 }
 
 // DeliverResponse is called when a JSON-RPC response is received from a device

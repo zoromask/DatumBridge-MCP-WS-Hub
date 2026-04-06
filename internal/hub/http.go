@@ -77,6 +77,9 @@ func checkRegisterAPIKey(r *http.Request) bool {
 // HandleDeviceMCP handles POST /api/v1/devices/{device_id}/mcp
 // Forwards MCP JSON-RPC to the device over WebSocket and returns the response.
 func (h *Hub) HandleDeviceMCP(w http.ResponseWriter, r *http.Request) {
+	corr := CorrelationIDFromRequest(r)
+	w.Header().Set(HeaderCorrelationID, corr)
+
 	if r.Method != http.MethodPost {
 		writeAPIError(w, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "method not allowed", false)
 		return
@@ -102,9 +105,8 @@ func (h *Hub) HandleDeviceMCP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp, ok := h.ForwardRequest(deviceID, body, requestTimeout)
+	resp, ok := h.ForwardRequestWithOpts(deviceID, body, requestTimeout, ForwardRequestOpts{CorrelationID: corr})
 	if !ok {
-		log.Warn().Str("device_id", deviceID).Msg("device not connected or request failed")
 		writeJSONRPCError(w, http.StatusBadGateway, -32000, "device not connected or request timeout")
 		return
 	}
@@ -161,8 +163,8 @@ func (h *Hub) HandleListPendingPairings(w http.ResponseWriter, _ *http.Request) 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	_ = json.NewEncoder(w).Encode(map[string]interface{}{
-		"pairings":              pending,
-		"pairing_ttl_seconds":   ttlSec,
+		"pairings":            pending,
+		"pairing_ttl_seconds": ttlSec,
 	})
 }
 

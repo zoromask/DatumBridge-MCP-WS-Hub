@@ -31,6 +31,10 @@ func (h *Hub) HandleMCPStreamableHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	corr := CorrelationIDFromRequest(r)
+	r = WithCorrelationID(r, corr)
+	w.Header().Set(HeaderCorrelationID, corr)
+
 	r.Body = http.MaxBytesReader(w, r.Body, maxBodySize)
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -174,11 +178,13 @@ func (h *Hub) handleMCPToolsCall(w http.ResponseWriter, r *http.Request, env rpc
 	case "hub_info":
 		infos := h.ListDeviceInfos()
 		summary, _ := json.Marshal(map[string]interface{}{
-			"service":         "datumbridge-mcp-ws-hub",
-			"protocol":        "MCP Streamable HTTP subset for DatumBridge publish/approve",
-			"devices":         infos,
-			"device_count":    len(infos),
-			"connected_count": countConnected(infos),
+			"service":                    "datumbridge-mcp-ws-hub",
+			"protocol":                   "MCP Streamable HTTP subset for DatumBridge publish/approve",
+			"hub_drift_protocol_version": HubDriftProtocolVersion,
+			"hub_expected_edge_version":  expectedEdgeVersion(),
+			"devices":                    infos,
+			"device_count":               len(infos),
+			"connected_count":            countConnected(infos),
 		})
 		writeMCPRPCResult(w, env.ID, mcpToolResultText(string(summary)))
 
@@ -201,7 +207,7 @@ func (h *Hub) handleMCPToolsCall(w http.ResponseWriter, r *http.Request, env rpc
 			writeMCPRPCError(w, env.ID, -32602, "jsonrpc_request must be valid JSON")
 			return
 		}
-		resp, ok := h.ForwardRequest(args.DeviceID, payload, requestTimeout)
+		resp, ok := h.ForwardRequestWithOpts(args.DeviceID, payload, requestTimeout, ForwardRequestOpts{CorrelationID: CorrelationIDFromContext(r)})
 		if !ok {
 			writeMCPRPCResult(w, env.ID, mcpToolResultError("device not connected or request timeout"))
 			return
@@ -210,7 +216,7 @@ func (h *Hub) handleMCPToolsCall(w http.ResponseWriter, r *http.Request, env rpc
 
 	default:
 		if isEdgeRelayTool(params.Name) {
-			h.handleMCPEdgeRelayTool(w, env, params)
+			h.handleMCPEdgeRelayTool(w, r, env, params)
 			return
 		}
 		writeMCPRPCError(w, env.ID, -32601, "unknown tool: "+params.Name)
@@ -229,7 +235,7 @@ func rpcIDToInterface(id json.RawMessage) interface{} {
 }
 
 // handleMCPEdgeRelayTool forwards tools/call to a connected DTBClaw device (native tool name).
-func (h *Hub) handleMCPEdgeRelayTool(w http.ResponseWriter, env rpcEnvelope, params mcpCallParams) {
+func (h *Hub) handleMCPEdgeRelayTool(w http.ResponseWriter, r *http.Request, env rpcEnvelope, params mcpCallParams) {
 	var args map[string]interface{}
 	if err := json.Unmarshal(params.Arguments, &args); err != nil || args == nil {
 		writeMCPRPCError(w, env.ID, -32602, "invalid arguments")
@@ -260,7 +266,7 @@ func (h *Hub) handleMCPEdgeRelayTool(w http.ResponseWriter, env rpcEnvelope, par
 		writeMCPRPCError(w, env.ID, -32603, "failed to build JSON-RPC payload")
 		return
 	}
-	resp, ok := h.ForwardRequest(deviceID, payload, requestTimeout)
+	resp, ok := h.ForwardRequestWithOpts(deviceID, payload, requestTimeout, ForwardRequestOpts{CorrelationID: CorrelationIDFromContext(r)})
 	if !ok {
 		writeMCPRPCResult(w, env.ID, mcpToolResultError("device not connected or request timeout"))
 		return

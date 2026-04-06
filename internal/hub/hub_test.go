@@ -215,6 +215,65 @@ func TestForwardRequestTimeout(t *testing.T) {
 	}
 }
 
+func TestForwardRequestRetryWhenSendBufferFull(t *testing.T) {
+	t.Setenv("HUB_FORWARD_SEND_RETRIES", "8")
+	t.Setenv("HUB_FORWARD_SEND_RETRY_INTERVAL_MS", "2")
+
+	h := newTestHub()
+	send := make(chan []byte, 1)
+	h.Register("dev-1", send, "")
+	send <- []byte("backlog")
+
+	req := `{"jsonrpc":"2.0","id":77,"method":"ping","params":{}}`
+	resp := `{"jsonrpc":"2.0","id":77,"result":true}`
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	var got []byte
+	var gotOK bool
+	go func() {
+		defer wg.Done()
+		got, gotOK = h.ForwardRequestWithOpts("dev-1", []byte(req), 3*time.Second, ForwardRequestOpts{CorrelationID: "t-retry"})
+	}()
+
+	time.Sleep(15 * time.Millisecond)
+	select {
+	case <-send:
+	default:
+		t.Fatal("expected backlog message in send channel")
+	}
+
+	msg := <-send
+	if string(msg) != req {
+		t.Fatalf("expected forwarded request, got %q", string(msg))
+	}
+	h.DeliverResponse("dev-1", []byte(resp))
+	wg.Wait()
+
+	if !gotOK {
+		t.Fatal("expected ForwardRequest to succeed after send retries")
+	}
+	if string(got) != resp {
+		t.Fatalf("expected %q, got %q", resp, string(got))
+	}
+}
+
+func TestForwardRequestFailsWhenSendBufferStaysFull(t *testing.T) {
+	t.Setenv("HUB_FORWARD_SEND_RETRIES", "2")
+	t.Setenv("HUB_FORWARD_SEND_RETRY_INTERVAL_MS", "1")
+
+	h := newTestHub()
+	send := make(chan []byte, 1)
+	h.Register("dev-1", send, "")
+	send <- []byte("backlog")
+
+	req := `{"jsonrpc":"2.0","id":88,"method":"ping","params":{}}`
+	_, ok := h.ForwardRequestWithOpts("dev-1", []byte(req), time.Second, ForwardRequestOpts{})
+	if ok {
+		t.Fatal("expected failure when buffer never drained")
+	}
+}
+
 func TestForwardRequestDuplicateID(t *testing.T) {
 	h := newTestHub()
 	send := make(chan []byte, 16)

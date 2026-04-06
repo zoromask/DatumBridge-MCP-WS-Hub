@@ -155,6 +155,6 @@ func (h *Hub) HandleWS(w http.ResponseWriter, r *http.Request) {
 			log.Debug().Err(err).Str("device_id", deviceID).Msg("read from device closed")
 			return
 		}
-		h.DeliverResponse(deviceID, msg)
+		h.HandleDeviceWSInbound(deviceID, msg)
 	}
 }
