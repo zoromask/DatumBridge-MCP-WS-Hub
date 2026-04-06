@@ -6,115 +6,118 @@
   <title>DatumBridge Gateway</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: system-ui, -apple-system, sans-serif; background: #09090b; color: #e4e4e7; display: flex; height: 100vh; overflow: hidden; }
+    /* Light theme — high contrast on white / zinc surfaces */
+    body { font-family: system-ui, -apple-system, sans-serif; background: #f4f4f5; color: #18181b; display: flex; height: 100vh; overflow: hidden; }
 
     /* ── Sidebar ── */
-    .sidebar { width: 220px; background: #0f0f12; border-right: 1px solid #1e1e24; display: flex; flex-direction: column; flex-shrink: 0; }
-    .sidebar-brand { padding: 1.25rem 1rem 1rem; border-bottom: 1px solid #1e1e24; }
-    .sidebar-brand h1 { font-size: 0.9375rem; font-weight: 700; color: #e4e4e7; }
-    .sidebar-brand p { font-size: 0.6875rem; color: #52525b; margin-top: 0.125rem; }
+    .sidebar { width: 220px; background: #ffffff; border-right: 1px solid #e4e4e7; display: flex; flex-direction: column; flex-shrink: 0; }
+    .sidebar-brand { padding: 1.25rem 1rem 1rem; border-bottom: 1px solid #e4e4e7; }
+    .sidebar-brand h1 { font-size: 0.9375rem; font-weight: 700; color: #18181b; }
+    .sidebar-brand p { font-size: 0.6875rem; color: #71717a; margin-top: 0.125rem; }
     .sidebar-nav { flex: 1; padding: 0.5rem; overflow-y: auto; }
-    .nav-item { display: flex; align-items: center; gap: 0.625rem; padding: 0.5rem 0.75rem; border-radius: 6px; font-size: 0.8125rem; color: #a1a1aa; cursor: pointer; transition: all 0.15s; text-decoration: none; }
-    .nav-item:hover { background: #18181b; color: #e4e4e7; }
-    .nav-item.active { background: #1e293b; color: #60a5fa; }
+    .nav-item { display: flex; align-items: center; gap: 0.625rem; padding: 0.5rem 0.75rem; border-radius: 6px; font-size: 0.8125rem; color: #52525b; cursor: pointer; transition: all 0.15s; text-decoration: none; }
+    .nav-item:hover { background: #f4f4f5; color: #18181b; }
+    .nav-item.active { background: #eff6ff; color: #1d4ed8; }
     .nav-item svg { width: 16px; height: 16px; flex-shrink: 0; }
-    .nav-section { padding: 0.75rem 0.75rem 0.25rem; font-size: 0.625rem; text-transform: uppercase; letter-spacing: 0.08em; color: #3f3f46; font-weight: 600; }
-    .sidebar-footer { padding: 0.75rem 1rem; border-top: 1px solid #1e1e24; font-size: 0.6875rem; color: #3f3f46; }
+    .nav-section { padding: 0.75rem 0.75rem 0.25rem; font-size: 0.625rem; text-transform: uppercase; letter-spacing: 0.08em; color: #71717a; font-weight: 600; }
+    .sidebar-footer { padding: 0.75rem 1rem; border-top: 1px solid #e4e4e7; font-size: 0.6875rem; color: #71717a; }
     .admin-badge { display: inline-block; background: #7c3aed; color: white; font-size: 0.5625rem; padding: 0.0625rem 0.375rem; border-radius: 9999px; margin-left: auto; font-weight: 600; }
 
     /* ── Main content ── */
-    .main { flex: 1; overflow-y: auto; }
+    .main { flex: 1; overflow-y: auto; background: #f4f4f5; }
     .page { display: none; padding: 1.5rem 2rem; max-width: 960px; }
     .page.active { display: block; }
-    .page-title { font-size: 1.25rem; font-weight: 700; margin-bottom: 0.25rem; }
-    .page-subtitle { font-size: 0.8125rem; color: #71717a; margin-bottom: 1.5rem; }
+    .page-title { font-size: 1.25rem; font-weight: 700; margin-bottom: 0.25rem; color: #18181b; }
+    .page-subtitle { font-size: 0.8125rem; color: #52525b; margin-bottom: 1.5rem; }
 
     /* ── Cards ── */
-    .card { background: #18181b; border: 1px solid #27272a; border-radius: 10px; padding: 1.25rem; margin-bottom: 1rem; }
-    .card-title { font-size: 0.9375rem; font-weight: 600; margin-bottom: 0.5rem; }
+    .card { background: #ffffff; border: 1px solid #e4e4e7; border-radius: 10px; padding: 1.25rem; margin-bottom: 1rem; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04); }
+    .card-title { font-size: 0.9375rem; font-weight: 600; margin-bottom: 0.5rem; color: #18181b; }
 
     /* ── Forms ── */
-    label { display: block; margin-bottom: 0.25rem; font-size: 0.8125rem; color: #a1a1aa; }
-    input, select, textarea, button { padding: 0.5rem 0.75rem; border-radius: 6px; border: 1px solid #3f3f46; background: #27272a; color: #e4e4e7; font-size: 0.8125rem; }
+    label { display: block; margin-bottom: 0.25rem; font-size: 0.8125rem; color: #3f3f46; }
+    input, select, textarea, button { padding: 0.5rem 0.75rem; border-radius: 6px; border: 1px solid #d4d4d8; background: #ffffff; color: #18181b; font-size: 0.8125rem; }
     input, select { width: 100%; }
     textarea { width: 100%; min-height: 100px; font-family: ui-monospace, monospace; resize: vertical; }
     button { cursor: pointer; }
-    button:hover { background: #3f3f46; }
+    button:hover { background: #f4f4f5; }
     .btn { display: inline-flex; align-items: center; gap: 0.375rem; padding: 0.5rem 1rem; border-radius: 8px; font-size: 0.8125rem; font-weight: 500; border: none; cursor: pointer; transition: all 0.15s; }
-    .btn-primary { background: #3b82f6; color: white; }
-    .btn-primary:hover { background: #2563eb; }
-    .btn-success { background: #22c55e; color: white; }
-    .btn-success:hover { background: #16a34a; }
+    .btn-primary { background: #2563eb; color: white; }
+    .btn-primary:hover { background: #1d4ed8; }
+    .btn-success { background: #16a34a; color: white; }
+    .btn-success:hover { background: #15803d; }
     .btn-danger { background: #dc2626; color: white; }
     .btn-danger:hover { background: #b91c1c; }
-    .btn-ghost { background: transparent; color: #a1a1aa; border: 1px solid #3f3f46; }
-    .btn-ghost:hover { background: #27272a; color: #e4e4e7; }
+    .btn-ghost { background: white; color: #52525b; border: 1px solid #d4d4d8; }
+    .btn-ghost:hover { background: #f4f4f5; color: #18181b; }
     .btn-sm { padding: 0.25rem 0.625rem; font-size: 0.75rem; }
 
     /* ── Device cards ── */
-    .device-card { display: flex; align-items: center; gap: 1rem; padding: 1rem; background: #111114; border: 1px solid #27272a; border-radius: 8px; margin-bottom: 0.5rem; }
+    .device-card { display: flex; align-items: center; gap: 1rem; padding: 1rem; background: #ffffff; border: 1px solid #e4e4e7; border-radius: 8px; margin-bottom: 0.5rem; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04); }
     .device-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
-    .device-dot.online { background: #22c55e; box-shadow: 0 0 6px #22c55e44; }
-    .device-dot.offline { background: #52525b; }
+    .device-dot.online { background: #16a34a; box-shadow: 0 0 0 2px rgba(22, 163, 74, 0.25); }
+    .device-dot.offline { background: #a1a1aa; }
     .device-info { flex: 1; min-width: 0; }
-    .device-name { font-weight: 600; font-size: 0.9375rem; }
-    .device-meta { font-size: 0.75rem; color: #71717a; margin-top: 0.125rem; }
+    .device-name { font-weight: 600; font-size: 0.9375rem; color: #18181b; }
+    .device-meta { font-size: 0.75rem; color: #52525b; margin-top: 0.125rem; }
     .device-actions { display: flex; gap: 0.375rem; flex-shrink: 0; }
 
     /* ── Tool grid ── */
     .tool-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.5rem; margin-top: 0.75rem; }
-    .tool-tile { background: #111114; border: 1px solid #27272a; border-radius: 8px; padding: 0.75rem; cursor: pointer; transition: all 0.15s; }
-    .tool-tile:hover { border-color: #3b82f6; background: #0f172a; }
-    .tool-tile.selected { border-color: #3b82f6; background: #1e293b; }
-    .tool-tile-name { font-weight: 600; font-size: 0.8125rem; margin-bottom: 0.25rem; }
-    .tool-tile-desc { font-size: 0.6875rem; color: #71717a; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .tool-tile { background: #ffffff; border: 1px solid #e4e4e7; border-radius: 8px; padding: 0.75rem; cursor: pointer; transition: all 0.15s; }
+    .tool-tile:hover { border-color: #2563eb; background: #eff6ff; }
+    .tool-tile.selected { border-color: #2563eb; background: #dbeafe; box-shadow: 0 0 0 1px #2563eb; }
+    .tool-tile-name { font-weight: 600; font-size: 0.8125rem; margin-bottom: 0.25rem; color: #18181b; }
+    .tool-tile-desc { font-size: 0.6875rem; color: #52525b; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 
     /* ── Tool form ── */
     .tool-form { margin-top: 1rem; }
     .tool-form .field { margin-bottom: 0.75rem; }
-    .tool-form .field-label { font-size: 0.8125rem; font-weight: 500; color: #d4d4d8; margin-bottom: 0.1875rem; }
-    .tool-form .field-hint { font-size: 0.6875rem; color: #52525b; margin-bottom: 0.25rem; }
-    .tool-form .field-required { color: #f87171; font-size: 0.625rem; margin-left: 0.25rem; }
+    .tool-form .field-label { font-size: 0.8125rem; font-weight: 500; color: #18181b; margin-bottom: 0.1875rem; }
+    .tool-form .field-hint { font-size: 0.6875rem; color: #71717a; margin-bottom: 0.25rem; }
+    .tool-form .field-required { color: #dc2626; font-size: 0.625rem; margin-left: 0.25rem; }
 
     /* ── Task output ── */
-    .task-output { margin-top: 0.75rem; background: #111114; border: 1px solid #27272a; border-radius: 8px; padding: 0.75rem; font-family: ui-monospace, monospace; font-size: 0.75rem; white-space: pre-wrap; word-break: break-all; max-height: 400px; overflow-y: auto; color: #a1a1aa; }
+    .task-output { margin-top: 0.75rem; background: #fafafa; border: 1px solid #e4e4e7; border-radius: 8px; padding: 0.75rem; font-family: ui-monospace, monospace; font-size: 0.75rem; white-space: pre-wrap; word-break: break-all; max-height: 400px; overflow-y: auto; color: #3f3f46; }
     .task-status { display: inline-flex; align-items: center; gap: 0.375rem; padding: 0.25rem 0.625rem; border-radius: 9999px; font-size: 0.6875rem; font-weight: 600; }
-    .task-status.running { background: #1e3a5f; color: #60a5fa; }
-    .task-status.completed { background: #14532d; color: #4ade80; }
-    .task-status.failed { background: #450a0a; color: #f87171; }
-    .task-status.idle { background: #27272a; color: #71717a; }
+    .task-status.running { background: #dbeafe; color: #1e40af; }
+    .task-status.completed { background: #dcfce7; color: #166534; }
+    .task-status.failed { background: #fee2e2; color: #991b1b; }
+    .task-status.idle { background: #f4f4f5; color: #52525b; }
 
     /* ── Flow guide ── */
     .flow-steps { display: flex; flex-direction: column; gap: 0.5rem; }
-    .flow-step { display: flex; gap: 0.75rem; align-items: flex-start; padding: 0.75rem 0; border-bottom: 1px solid #1e1e24; }
+    .flow-step { display: flex; gap: 0.75rem; align-items: flex-start; padding: 0.75rem 0; border-bottom: 1px solid #e4e4e7; }
     .flow-step:last-child { border-bottom: none; }
-    .step-num { flex-shrink: 0; width: 1.5rem; height: 1.5rem; display: inline-flex; align-items: center; justify-content: center; background: #3f3f46; border-radius: 50%; font-size: 0.6875rem; font-weight: 700; }
-    .step-desc { margin: 0.25rem 0 0.5rem; font-size: 0.8125rem; color: #a1a1aa; line-height: 1.5; }
-    .step-desc code { background: #27272a; padding: 0.0625rem 0.375rem; border-radius: 4px; font-size: 0.75rem; }
+    .flow-step strong { color: #18181b; }
+    .step-num { flex-shrink: 0; width: 1.5rem; height: 1.5rem; display: inline-flex; align-items: center; justify-content: center; background: #e4e4e7; color: #18181b; border-radius: 50%; font-size: 0.6875rem; font-weight: 700; }
+    .step-desc { margin: 0.25rem 0 0.5rem; font-size: 0.8125rem; color: #52525b; line-height: 1.5; }
+    .step-desc code { background: #f4f4f5; color: #18181b; padding: 0.0625rem 0.375rem; border-radius: 4px; font-size: 0.75rem; border: 1px solid #e4e4e7; }
 
     /* ── Pairing display ── */
-    .pairing-code { font-size: 2rem; font-weight: 700; letter-spacing: 0.3em; color: #60a5fa; text-align: center; padding: 1rem; }
-    .pairing-pending-row { padding: 1rem; border-bottom: 1px solid #27272a; }
+    .pairing-code { font-size: 2rem; font-weight: 700; letter-spacing: 0.3em; color: #1d4ed8; text-align: center; padding: 1rem; }
+    .pairing-pending-row { padding: 1rem; border-bottom: 1px solid #e4e4e7; }
     .pairing-pending-row:last-child { border-bottom: none; }
-    .pairing-pending-label { font-size: 0.6875rem; text-transform: uppercase; letter-spacing: 0.06em; color: #52525b; margin-bottom: 0.25rem; }
-    .pairing-pending-device { font-family: ui-monospace, monospace; font-size: 0.8125rem; color: #a1a1aa; word-break: break-all; margin-bottom: 0.75rem; line-height: 1.4; }
-    .pairing-countdown { font-family: ui-monospace, monospace; font-size: 1.125rem; font-weight: 700; color: #4ade80; letter-spacing: 0.04em; margin-bottom: 0.375rem; }
-    .pairing-pending-row.pairing-soon .pairing-countdown { color: #fbbf24; }
-    .pairing-pending-row.pairing-expired .pairing-countdown { color: #f87171; }
-    .pairing-pending-row.pairing-expired { opacity: 0.7; }
+    .pairing-pending-label { font-size: 0.6875rem; text-transform: uppercase; letter-spacing: 0.06em; color: #71717a; margin-bottom: 0.25rem; }
+    .pairing-pending-device { font-family: ui-monospace, monospace; font-size: 0.8125rem; color: #3f3f46; word-break: break-all; margin-bottom: 0.75rem; line-height: 1.4; }
+    .pairing-countdown { font-family: ui-monospace, monospace; font-size: 1.125rem; font-weight: 700; color: #15803d; letter-spacing: 0.04em; margin-bottom: 0.375rem; }
+    .pairing-pending-row.pairing-soon .pairing-countdown { color: #a16207; }
+    .pairing-pending-row.pairing-expired .pairing-countdown { color: #b91c1c; }
+    .pairing-pending-row.pairing-expired { opacity: 0.85; }
     .pairing-pending-row.pairing-expired .pairing-code { color: #71717a; }
-    .pairing-renew-hint { font-size: 0.6875rem; color: #52525b; line-height: 1.4; }
-    .pairing-renew-hint code { background: #27272a; padding: 0.0625rem 0.3125rem; border-radius: 4px; font-size: 0.625rem; }
+    .pairing-renew-hint { font-size: 0.6875rem; color: #71717a; line-height: 1.4; }
+    .pairing-renew-hint code { background: #f4f4f5; color: #18181b; padding: 0.0625rem 0.3125rem; border-radius: 4px; font-size: 0.625rem; border: 1px solid #e4e4e7; }
 
     /* ── MCP Console ── */
-    .console-response { min-height: 100px; font-family: ui-monospace, monospace; font-size: 0.75rem; white-space: pre-wrap; word-break: break-all; background: #111114; border: 1px solid #27272a; border-radius: 8px; padding: 0.75rem; margin-top: 0.5rem; max-height: 500px; overflow-y: auto; }
-    .tool-info { margin-top: 0.375rem; padding: 0.625rem; background: #111114; border-radius: 6px; border: 1px solid #27272a; font-size: 0.75rem; color: #a1a1aa; }
-    .tool-info .tool-info-name { color: #e4e4e7; font-weight: 600; margin-bottom: 0.25rem; }
-    .tool-info code { color: #60a5fa; }
-    .tool-info .req { color: #f87171; font-size: 0.625rem; }
+    .console-response { min-height: 100px; font-family: ui-monospace, monospace; font-size: 0.75rem; white-space: pre-wrap; word-break: break-all; background: #fafafa; border: 1px solid #e4e4e7; border-radius: 8px; padding: 0.75rem; margin-top: 0.5rem; max-height: 500px; overflow-y: auto; color: #3f3f46; }
+    .tool-info { margin-top: 0.375rem; padding: 0.625rem; background: #fafafa; border-radius: 6px; border: 1px solid #e4e4e7; font-size: 0.75rem; color: #52525b; }
+    .tool-info .tool-info-name { color: #18181b; font-weight: 600; margin-bottom: 0.25rem; }
+    .tool-info code { color: #1d4ed8; font-weight: 500; }
+    .tool-info .req { color: #dc2626; font-size: 0.625rem; }
 
     /* ── Misc ── */
-    .empty-state { text-align: center; color: #52525b; padding: 2rem; font-size: 0.875rem; }
+    .empty-state { text-align: center; color: #71717a; padding: 2rem; font-size: 0.875rem; }
+    .empty-state code { background: #f4f4f5; color: #18181b; padding: 0.125rem 0.375rem; border-radius: 4px; font-size: 0.8125rem; border: 1px solid #e4e4e7; }
     .mb-1 { margin-bottom: 0.5rem; }
     .mt-1 { margin-top: 0.5rem; }
     .mt-2 { margin-top: 1rem; }
@@ -134,16 +137,16 @@
     }
     .toast {
       pointer-events: auto;
-      background: #18181b;
+      background: #ffffff;
       border: 1px solid #2563eb;
       border-radius: 10px;
       padding: 0.875rem 2.25rem 0.75rem 1rem;
-      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55);
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.06);
       animation: toast-in 0.22s ease-out;
       position: relative;
       cursor: pointer;
     }
-    .toast:hover { border-color: #60a5fa; }
+    .toast:hover { border-color: #1d4ed8; box-shadow: 0 12px 44px rgba(37, 99, 235, 0.15), 0 2px 8px rgba(0, 0, 0, 0.06); }
     .toast-close {
       position: absolute;
       top: 0.375rem;
@@ -162,11 +165,12 @@
       justify-content: center;
       padding: 0;
     }
-    .toast-close:hover { background: #27272a; color: #e4e4e7; }
-    .toast-title { font-size: 0.8125rem; font-weight: 700; color: #e4e4e7; margin-bottom: 0.5rem; }
-    .toast-line { font-family: ui-monospace, monospace; font-size: 0.75rem; color: #a1a1aa; margin-bottom: 0.25rem; line-height: 1.4; word-break: break-all; }
-    .toast-line .toast-code { color: #60a5fa; font-weight: 600; letter-spacing: 0.12em; }
-    .toast-hint { font-size: 0.625rem; color: #52525b; margin-top: 0.5rem; }
+    .toast-close:hover { background: #f4f4f5; color: #18181b; }
+    .toast-title { font-size: 0.8125rem; font-weight: 700; color: #18181b; margin-bottom: 0.5rem; }
+    .toast-line { font-family: ui-monospace, monospace; font-size: 0.75rem; color: #52525b; margin-bottom: 0.25rem; line-height: 1.4; word-break: break-all; }
+    .toast-line .toast-did { color: #3f3f46; }
+    .toast-line .toast-code { color: #1d4ed8; font-weight: 600; letter-spacing: 0.12em; }
+    .toast-hint { font-size: 0.625rem; color: #71717a; margin-top: 0.5rem; }
     @keyframes toast-in {
       from { opacity: 0; transform: translateX(8px); }
       to { opacity: 1; transform: translateX(0); }
@@ -229,8 +233,8 @@
 
       <div class="card" id="gw-tools-card" style="display:none;">
         <div class="card-title" style="display:flex;align-items:center;gap:0.5rem;">
-          <span id="gw-target-name" style="color:#60a5fa;"></span>
-          <span style="font-size:0.6875rem;color:#52525b;font-weight:400;" id="gw-target-id-label"></span>
+          <span id="gw-target-name" style="color:#1d4ed8;"></span>
+          <span style="font-size:0.6875rem;color:#71717a;font-weight:400;" id="gw-target-id-label"></span>
           <button class="btn btn-ghost btn-sm" style="margin-left:auto;" id="gw-change-device">Change</button>
         </div>
         <label>Choose a tool</label>
@@ -242,7 +246,7 @@
           <div class="card-title" style="margin:0;" id="gw-form-tool-name"></div>
           <button class="btn btn-ghost btn-sm" id="gw-back-tools">Back to tools</button>
         </div>
-        <div style="font-size:0.8125rem;color:#71717a;margin-bottom:1rem;" id="gw-form-tool-desc"></div>
+        <div style="font-size:0.8125rem;color:#52525b;margin-bottom:1rem;" id="gw-form-tool-desc"></div>
         <div class="tool-form" id="gw-form-fields"></div>
         <div class="gap-row">
           <button class="btn btn-primary" id="gw-run">Run</button>
@@ -251,7 +255,7 @@
           <div class="gap-row mb-1">
             <span class="task-status idle" id="gw-status-badge">Idle</span>
             <button class="btn btn-ghost btn-sm" id="gw-check-status" style="display:none;">Check Status</button>
-            <span style="font-size:0.6875rem;color:#52525b;" id="gw-status-time"></span>
+            <span style="font-size:0.6875rem;color:#71717a;" id="gw-status-time"></span>
           </div>
           <div class="task-output" id="gw-output"></div>
         </div>
@@ -585,7 +589,7 @@
       const required = tool.inputSchema?.required || [];
       const keys = Object.keys(props);
       if (keys.length === 0) {
-        container.innerHTML = '<div style="color:#52525b;font-size:0.8125rem;">This tool takes no parameters.</div>';
+        container.innerHTML = '<div style="color:#71717a;font-size:0.8125rem;">This tool takes no parameters.</div>';
         return;
       }
       keys.forEach(k => {
@@ -623,7 +627,7 @@
         cb.style.cssText = 'width:auto;';
         const lbl = document.createElement('span');
         lbl.textContent = 'Yes';
-        lbl.style.cssText = 'font-size:0.8125rem;color:#a1a1aa;';
+        lbl.style.cssText = 'font-size:0.8125rem;color:#52525b;';
         wrap.appendChild(cb);
         wrap.appendChild(lbl);
         return wrap;
@@ -810,7 +814,7 @@
         div.innerHTML = `
           <span class="device-dot ${connected ? 'online' : 'offline'}"></span>
           <div class="device-info">
-            <div class="device-name">${name || id} ${name ? '<span style="color:#52525b;font-weight:400;font-size:0.75rem;">' + id + '</span>' : ''}</div>
+            <div class="device-name">${name || id} ${name ? '<span style="color:#71717a;font-weight:400;font-size:0.75rem;">' + id + '</span>' : ''}</div>
             <div class="device-meta">${meta}</div>
           </div>
           <div class="device-actions">
@@ -946,7 +950,7 @@
       let html = '<div class="tool-info"><div class="tool-info-name">' + tool.name + '</div>';
       if (tool.description) html += '<div style="margin-bottom:0.375rem;">' + tool.description + '</div>';
       Object.entries(props).forEach(([k, v]) => {
-        html += `<div><code>${k}</code> <span style="color:#52525b;">${v.type || 'any'}${v.enum ? ' [' + v.enum.join(', ') + ']' : ''}</span>${req.includes(k) ? ' <span class="req">required</span>' : ''}${v.description ? ' — ' + v.description : ''}</div>`;
+        html += `<div><code>${k}</code> <span style="color:#71717a;">${v.type || 'any'}${v.enum ? ' [' + v.enum.join(', ') + ']' : ''}</span>${req.includes(k) ? ' <span class="req">required</span>' : ''}${v.description ? ' — ' + v.description : ''}</div>`;
       });
       html += '</div>';
       infoEl.innerHTML = html;
