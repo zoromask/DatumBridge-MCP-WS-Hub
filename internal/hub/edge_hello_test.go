@@ -88,3 +88,44 @@ func TestListDeviceInfosIncludesEdgeMeta(t *testing.T) {
 		t.Fatalf("expected hub expected: %q", found.HubExpectedEdgeV)
 	}
 }
+
+func TestListDeviceInfosIncludesMissionCaps(t *testing.T) {
+	h := newTestHub()
+	send := make(chan []byte, 4)
+	h.Register("dev-m", send, "127.0.0.1")
+
+	hello := map[string]interface{}{
+		"datumbridge": map[string]interface{}{
+			"v": 1,
+			"edge": map[string]interface{}{
+				"protocol":              1,
+				"version":               "1.0.0",
+				"git_sha":               "deadbeef",
+				"local_llm_available":   true,
+				"supports_edge_mission": true,
+				"mission_tool_name":     "edge_agent_run",
+				"edge_mission_protocol": 1,
+			},
+		},
+	}
+	b, _ := json.Marshal(hello)
+	h.tryConsumeEdgeHello("dev-m", b)
+
+	infos := h.ListDeviceInfos()
+	var found *DeviceInfo
+	for i := range infos {
+		if infos[i].DeviceID == "dev-m" {
+			found = &infos[i]
+			break
+		}
+	}
+	if found == nil {
+		t.Fatal("device dev-m not in list")
+	}
+	if !found.LocalLLMAvailable || !found.SupportsEdgeMission {
+		t.Fatalf("caps: local_llm=%v mission=%v", found.LocalLLMAvailable, found.SupportsEdgeMission)
+	}
+	if found.MissionToolName != "edge_agent_run" || found.EdgeMissionProtocol != 1 {
+		t.Fatalf("mission meta: tool=%q proto=%d", found.MissionToolName, found.EdgeMissionProtocol)
+	}
+}

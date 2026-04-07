@@ -22,6 +22,7 @@ type dtbClawEdgeTool struct {
 	McpToolName string                 `json:"mcpToolName"`
 	Description string                 `json:"description"`
 	InputSchema map[string]interface{} `json:"inputSchema"`
+	Metadata    map[string]interface{} `json:"metadata,omitempty"`
 }
 
 var (
@@ -122,11 +123,15 @@ func edgeRelayToolDescriptors() ([]map[string]interface{}, error) {
 			desc += " (profile: " + m.Profile + ")"
 		}
 
-		out = append(out, map[string]interface{}{
+		entry := map[string]interface{}{
 			"name":        t.McpToolName,
 			"description": desc,
 			"inputSchema": schema,
-		})
+		}
+		if len(t.Metadata) > 0 {
+			entry["metadata"] = cloneMap(t.Metadata)
+		}
+		out = append(out, entry)
 	}
 	return out, nil
 }

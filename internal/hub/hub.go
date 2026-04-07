@@ -25,6 +25,11 @@ type Conn struct {
 	EdgeProto   int
 	DriftStatus string    // unknown | ok | warn
 	HelloAt     time.Time // UTC when last edge hello applied
+	// From edge hello: Approach 2/3 capability advertisement (omit in hello ⇒ false / fail closed).
+	LocalLLMAvailable   bool
+	SupportsEdgeMission bool
+	MissionToolName     string
+	EdgeMissionProtocol int
 }
 
 // DeviceInfo is the combined view of a device (persisted metadata + live connection state).
@@ -44,6 +49,11 @@ type DeviceInfo struct {
 	DriftStatus      string `json:"drift_status,omitempty"`
 	EdgeHelloAt      string `json:"edge_hello_at,omitempty"`
 	HubExpectedEdgeV string `json:"hub_expected_edge_version,omitempty"`
+	// Edge-reported capability flags (datumbridge edge_hello); false when offline or not advertised.
+	LocalLLMAvailable   bool   `json:"local_llm_available"`
+	SupportsEdgeMission bool   `json:"supports_edge_mission"`
+	MissionToolName     string `json:"mission_tool_name,omitempty"`
+	EdgeMissionProtocol int    `json:"edge_mission_protocol,omitempty"`
 }
 
 // pendingReq holds a waiting HTTP request for a JSON-RPC response
@@ -177,12 +187,16 @@ func (h *Hub) ListDeviceInfos() []DeviceInfo {
 			info.Connected = true
 			info.ConnectedIP = conn.ConnectedIP
 			info.ConnectedAt = conn.ConnectedAt.Format(time.RFC3339)
-			ver, sha, proto, drift, hello := conn.edgeSnapshot()
+			ver, sha, proto, drift, hello, caps := conn.edgeSnapshot()
 			info.EdgeVersion = ver
 			info.EdgeGitSHA = sha
 			info.EdgeProtocol = proto
 			info.DriftStatus = drift
 			info.HubExpectedEdgeV = expectedEdgeVersion()
+			info.LocalLLMAvailable = caps.LocalLLMAvailable
+			info.SupportsEdgeMission = caps.SupportsEdgeMission
+			info.MissionToolName = caps.MissionToolName
+			info.EdgeMissionProtocol = caps.EdgeMissionProtocol
 			if !hello.IsZero() {
 				info.EdgeHelloAt = hello.Format(time.RFC3339)
 			}
@@ -198,12 +212,16 @@ func (h *Hub) ListDeviceInfos() []DeviceInfo {
 				ConnectedIP: conn.ConnectedIP,
 				ConnectedAt: conn.ConnectedAt.Format(time.RFC3339),
 			}
-			ver, sha, proto, drift, hello := conn.edgeSnapshot()
+			ver, sha, proto, drift, hello, caps := conn.edgeSnapshot()
 			di.EdgeVersion = ver
 			di.EdgeGitSHA = sha
 			di.EdgeProtocol = proto
 			di.DriftStatus = drift
 			di.HubExpectedEdgeV = expectedEdgeVersion()
+			di.LocalLLMAvailable = caps.LocalLLMAvailable
+			di.SupportsEdgeMission = caps.SupportsEdgeMission
+			di.MissionToolName = caps.MissionToolName
+			di.EdgeMissionProtocol = caps.EdgeMissionProtocol
 			if !hello.IsZero() {
 				di.EdgeHelloAt = hello.Format(time.RFC3339)
 			}

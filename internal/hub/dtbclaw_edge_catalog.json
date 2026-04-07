@@ -782,6 +782,51 @@
       "registryId": "edge_dtbclaw_docx_read"
     },
     {
+      "description": "Bounded edge mission: run a high-level objective on this gateway with strict max steps and wall time. Enforces operator caps; returns an acceptance envelope with negotiated budgets (Approach 2/3 contract).",
+      "inputSchema": {
+        "properties": {
+          "correlation_id": {
+            "description": "Optional id to join master run ↔ edge mission in logs.",
+            "type": "string"
+          },
+          "max_steps": {
+            "description": "Requested maximum tool/agent steps (clamped by gateway).",
+            "type": "integer"
+          },
+          "max_wall_seconds": {
+            "description": "Requested wall-clock budget in seconds (clamped by gateway).",
+            "type": "integer"
+          },
+          "mission_protocol": {
+            "description": "Expected mission protocol version from master (must match edge).",
+            "type": "integer"
+          },
+          "objective": {
+            "description": "High-level task for the edge agent loop.",
+            "type": "string"
+          },
+          "tool_allowlist": {
+            "description": "Optional subset of MCP tool names the mission may invoke (gateway may further restrict).",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "objective"
+        ],
+        "type": "object"
+      },
+      "metadata": {
+        "edgeDevice": true,
+        "requiresEdgeMission": true
+      },
+      "mcpToolName": "edge_agent_run",
+      "name": "Edge: edge_agent_run",
+      "registryId": "edge_dtbclaw_edge_agent_run"
+    },
+    {
       "description": "Estimate quota cost (tokens, requests) for an operation before executing it. Useful for warning user if operation may exhaust quota or when planning parallel tool calls.",
       "inputSchema": {
         "properties": {

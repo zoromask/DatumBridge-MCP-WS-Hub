@@ -144,6 +144,17 @@ The gateway opens **WebSocket** `wss://` or `ws://` to `{url}/ws?device_id=...&t
 | **`error decoding response body`** on `octoclaw register` | Response was HTML (SPA): Ingress stripped `/api/ws-hub` or Studio nginx missing hub locations; use current `datumbridge-studio/nginx.conf` (proxies `/api/ws-hub/*`, `/api/v1/devices/*`, `/mcp`, `/ws`). |
 | **405** on register | Request hit hub static `FileServer`; fixed by hub **`HUB_HTTP_STRIP_PREFIX`** path strip or correct proxy path stripping (see below). |
 
+### Edge hello: LLM / mission capability flags (optional)
+
+For **Approach 3** (bounded edge missions) and future **Approach 2** work, the edge may advertise capabilities on the existing WebSocket **datumbridge** envelope or `datumbridge/edge_hello` JSON-RPC (see `internal/hub/edge_hello.go`). **Omitted fields mean false** (fail closed).
+
+Supported shapes:
+
+- **Flat** on the `edge` object / RPC params: `local_llm_available`, `supports_edge_mission`, `mission_tool_name`, `edge_mission_protocol`
+- **Nested** under `edge.capabilities` (or RPC `params.capabilities`) with the same keys
+
+`GET /api/v1/devices` includes `local_llm_available`, `supports_edge_mission`, `mission_tool_name`, and `edge_mission_protocol` on each device when connected. Headless gateways should omit these or set them false.
+
 ## Setup
 
 ### Environment Variables

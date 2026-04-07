@@ -35,7 +35,7 @@ func computeDriftStatus(edgeVersion string) string {
 	return "warn"
 }
 
-func (c *Conn) applyEdgeMeta(version, gitSHA string, protocol int, drift string) {
+func (c *Conn) applyEdgeHello(version, gitSHA string, protocol int, drift string, caps EdgeCapabilityFields) {
 	if c == nil {
 		return
 	}
@@ -45,12 +45,16 @@ func (c *Conn) applyEdgeMeta(version, gitSHA string, protocol int, drift string)
 	c.EdgeGitSHA = gitSHA
 	c.EdgeProto = protocol
 	c.DriftStatus = drift
+	c.LocalLLMAvailable = caps.LocalLLMAvailable
+	c.SupportsEdgeMission = caps.SupportsEdgeMission
+	c.MissionToolName = caps.MissionToolName
+	c.EdgeMissionProtocol = caps.EdgeMissionProtocol
 	c.HelloAt = time.Now().UTC()
 }
 
-func (c *Conn) edgeSnapshot() (version, gitSHA string, protocol int, drift string, helloAt time.Time) {
+func (c *Conn) edgeSnapshot() (version, gitSHA string, protocol int, drift string, helloAt time.Time, caps EdgeCapabilityFields) {
 	if c == nil {
-		return "", "", 0, "unknown", time.Time{}
+		return "", "", 0, "unknown", time.Time{}, EdgeCapabilityFields{}
 	}
 	c.edgeMu.RLock()
 	defer c.edgeMu.RUnlock()
@@ -58,7 +62,13 @@ func (c *Conn) edgeSnapshot() (version, gitSHA string, protocol int, drift strin
 	if d == "" {
 		d = "unknown"
 	}
-	return c.EdgeVersion, c.EdgeGitSHA, c.EdgeProto, d, c.HelloAt
+	caps = EdgeCapabilityFields{
+		LocalLLMAvailable:   c.LocalLLMAvailable,
+		SupportsEdgeMission: c.SupportsEdgeMission,
+		MissionToolName:     c.MissionToolName,
+		EdgeMissionProtocol: c.EdgeMissionProtocol,
+	}
+	return c.EdgeVersion, c.EdgeGitSHA, c.EdgeProto, d, c.HelloAt, caps
 }
 
 // isMCPJSONRPCResponse is true for JSON-RPC 2.0 responses (result or error, no method).
@@ -109,10 +119,15 @@ func (h *Hub) tryConsumeEdgeHello(deviceID string, msg []byte) bool {
 		var inner struct {
 			V    int `json:"v"`
 			Edge struct {
-				Protocol   int    `json:"protocol"`
-				Version    string `json:"version"`
-				GitSHA     string `json:"git_sha"`
-				ServerName string `json:"server_name"`
+				Protocol            int            `json:"protocol"`
+				Version             string         `json:"version"`
+				GitSHA              string         `json:"git_sha"`
+				ServerName          string         `json:"server_name"`
+				LocalLLMAvailable   *bool          `json:"local_llm_available,omitempty"`
+				SupportsEdgeMission *bool          `json:"supports_edge_mission,omitempty"`
+				MissionToolName     string         `json:"mission_tool_name,omitempty"`
+				EdgeMissionProtocol int            `json:"edge_mission_protocol,omitempty"`
+				Capabilities        *edgeCapsBlock `json:"capabilities,omitempty"`
 			} `json:"edge"`
 		}
 		if err := json.Unmarshal(wrap.Datumbridge, &inner); err != nil || inner.V < 1 {
@@ -125,7 +140,8 @@ func (h *Hub) tryConsumeEdgeHello(deviceID string, msg []byte) bool {
 			proto = HubDriftProtocolVersion
 		}
 		drift := computeDriftStatus(evVer)
-		h.applyEdgeHelloToDevice(deviceID, evVer, evSha, proto, drift)
+		caps := mergeEdgeCaps(inner.Edge.Capabilities, inner.Edge.LocalLLMAvailable, inner.Edge.SupportsEdgeMission, inner.Edge.MissionToolName, inner.Edge.EdgeMissionProtocol)
+		h.applyEdgeHelloToDevice(deviceID, evVer, evSha, proto, drift, caps)
 		log.Info().Str("device_id", deviceID).Str("edge_version", evVer).Str("drift_status", drift).Msg("edge hello (datumbridge envelope)")
 		h.queueHubHandshake(deviceID)
 		return true
@@ -143,9 +159,14 @@ func (h *Hub) tryConsumeEdgeHello(deviceID string, msg []byte) bool {
 		return false
 	}
 	var params struct {
-		Version  string `json:"version"`
-		GitSHA   string `json:"git_sha"`
-		Protocol int    `json:"protocol"`
+		Version             string         `json:"version"`
+		GitSHA              string         `json:"git_sha"`
+		Protocol            int            `json:"protocol"`
+		LocalLLMAvailable   *bool          `json:"local_llm_available,omitempty"`
+		SupportsEdgeMission *bool          `json:"supports_edge_mission,omitempty"`
+		MissionToolName     string         `json:"mission_tool_name,omitempty"`
+		EdgeMissionProtocol int            `json:"edge_mission_protocol,omitempty"`
+		Capabilities        *edgeCapsBlock `json:"capabilities,omitempty"`
 	}
 	if len(rpc.Params) > 0 && string(rpc.Params) != "null" {
 		_ = json.Unmarshal(rpc.Params, &params)
@@ -157,20 +178,21 @@ func (h *Hub) tryConsumeEdgeHello(deviceID string, msg []byte) bool {
 		proto = HubDriftProtocolVersion
 	}
 	drift := computeDriftStatus(evVer)
-	h.applyEdgeHelloToDevice(deviceID, evVer, evSha, proto, drift)
+	caps := mergeEdgeCaps(params.Capabilities, params.LocalLLMAvailable, params.SupportsEdgeMission, params.MissionToolName, params.EdgeMissionProtocol)
+	h.applyEdgeHelloToDevice(deviceID, evVer, evSha, proto, drift, caps)
 	log.Info().Str("device_id", deviceID).Str("edge_version", evVer).Str("drift_status", drift).Msg("edge hello (json-rpc)")
 	h.queueHubHandshake(deviceID)
 	return true
 }
 
-func (h *Hub) applyEdgeHelloToDevice(deviceID, version, gitSHA string, protocol int, drift string) {
+func (h *Hub) applyEdgeHelloToDevice(deviceID, version, gitSHA string, protocol int, drift string, caps EdgeCapabilityFields) {
 	h.mu.RLock()
 	c := h.conns[deviceID]
 	h.mu.RUnlock()
 	if c == nil {
 		return
 	}
-	c.applyEdgeMeta(version, gitSHA, protocol, drift)
+	c.applyEdgeHello(version, gitSHA, protocol, drift, caps)
 }
 
 func (h *Hub) queueHubHandshake(deviceID string) {
@@ -182,7 +204,7 @@ func (h *Hub) queueHubHandshake(deviceID string) {
 	c := h.conns[deviceID]
 	h.mu.RUnlock()
 	if c != nil {
-		ver, sha, proto, drift, _ := c.edgeSnapshot()
+		ver, sha, proto, drift, _, _ := c.edgeSnapshot()
 		params["edge_reported_version"] = ver
 		params["edge_git_sha"] = sha
 		params["edge_protocol"] = proto
