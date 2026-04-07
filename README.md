@@ -46,7 +46,7 @@ curl -X POST http://localhost:8000/api/v1/devices/register \
 ### 6-Digit Pairing Flow
 
 1. **Hub side**: `POST /api/v1/devices/register` with `{"pairing": true}` → returns `pairing_code`
-2. **Device side**: `zeroclaw register` → prompts for the 6-digit code
+2. **Device side**: `octoclaw register` → prompts for the 6-digit code
 3. **Device side**: `POST /api/v1/devices/register/confirm` with `{"pairing_code": "123456"}` → returns `device_id` + `token`
 4. Device connects to `/ws?device_id=...&token=...`
 

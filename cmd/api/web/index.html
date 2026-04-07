@@ -312,8 +312,8 @@
       <div class="page-subtitle">Step-by-step flow to pair and test a device</div>
       <div class="card">
         <div class="flow-steps">
-          <div class="flow-step"><span class="step-num">1</span><div><strong>Start ZeroClaw</strong><p class="step-desc">Run <code>zeroclaw gateway</code> with the hub URL in config, then run <code>zeroclaw register</code> in another terminal to create a pairing code.</p></div></div>
-          <div class="flow-step"><span class="step-num">2</span><div><strong>Confirm pairing</strong><p class="step-desc">Go to the <strong>Pairing</strong> page to see pending codes. In the ZeroClaw terminal running <code>register</code>, enter the code when prompted.</p></div></div>
+          <div class="flow-step"><span class="step-num">1</span><div><strong>Start OctoClaw</strong><p class="step-desc">Run <code>octoclaw gateway</code> with the hub URL in config, then run <code>octoclaw register</code> in another terminal to create a pairing code.</p></div></div>
+          <div class="flow-step"><span class="step-num">2</span><div><strong>Confirm pairing</strong><p class="step-desc">Go to the <strong>Pairing</strong> page to see pending codes. In the OctoClaw terminal running <code>register</code>, enter the code when prompted.</p></div></div>
           <div class="flow-step"><span class="step-num">3</span><div><strong>Device connects</strong><p class="step-desc">After pairing, the device appears on the <strong>Gateway</strong> page. Click <strong>Use</strong> to see all tools available on that device.</p></div></div>
           <div class="flow-step"><span class="step-num">4</span><div><strong>Use any tool</strong><p class="step-desc">Pick a tool from the grid. A dynamic form appears with all parameters. Fill in what you need, click <strong>Run</strong>, and see the result. For <code>cursor_cli</code> agent tasks, status is polled automatically.</p></div></div>
           <div class="flow-step"><span class="step-num">5</span><div><strong>Advanced: MCP Console</strong><p class="step-desc">Use the <strong>MCP Console</strong> to send raw JSON-RPC requests: <code>initialize</code>, <code>tools/list</code>, <code>tools/call</code>.</p></div></div>
@@ -500,7 +500,7 @@
     function renderGatewayDevices() {
       const el = document.getElementById('gw-devices');
       if (allDevices.length === 0) {
-        el.innerHTML = '<div class="empty-state">No devices registered yet.<br>Run <code>zeroclaw register</code> to pair a device.</div>';
+        el.innerHTML = '<div class="empty-state">No devices registered yet.<br>Run <code>octoclaw register</code> to pair a device.</div>';
         return;
       }
       el.innerHTML = '';
@@ -868,7 +868,7 @@
 
         const el = document.getElementById('adm-pairings-list');
         if (list.length === 0) {
-          el.innerHTML = '<div class="empty-state">No pending pairings.<br>Run <code>zeroclaw register</code> to create one.</div>';
+          el.innerHTML = '<div class="empty-state">No pending pairings.<br>Run <code>octoclaw register</code> to create one.</div>';
         } else {
           el.innerHTML = list.map(p => {
             const expRaw = p.expires_at != null ? String(p.expires_at) : '';

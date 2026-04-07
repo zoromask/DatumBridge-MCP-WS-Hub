@@ -223,7 +223,7 @@ func (h *Hub) HandleRegisterDevice(w http.ResponseWriter, r *http.Request) {
 		}
 		expiresAt := time.Now().Add(PairingTTL())
 		h.pairingStore.Add(code, cred, expiresAt)
-		log.Info().Str("device_id", cred.DeviceID).Str("pairing_code", code).Time("expires_at", expiresAt).Msg("new pairing request — enter this code in zeroclaw register")
+		log.Info().Str("device_id", cred.DeviceID).Str("pairing_code", code).Time("expires_at", expiresAt).Msg("new pairing request — enter this code in octoclaw register")
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
 		exp := expiresAt
